@@ -1,15 +1,13 @@
 ---
-sokol-kovan:
+# EXECUTION COMMAND:
+# ansible-playbook -e 'ansible_python_interpreter=/usr/bin/python3' -i hosts.yml site.yml --ask-become --limit <group_vars_config>
+all:
   children:
     oracle:
-      hosts:
-        127.0.0.1:
-          ansible_user: ubuntu
-          ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          #syslog_server_port: "udp://127.0.0.1:514"
-    monitor:
-      hosts:
-        127.0.0.1:
-          ansible_user: ubuntu
-          #syslog_server_port: "<protocol>://<ip>:<port>"
-          #monitor_cron_schedule: "*/4 * * * *"
+      children:
+        <group_vars_config>:
+          hosts:
+            <host_ip>:
+              ansible_user: <user>
+              ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY: "........................." # without 0x
+              #syslog_server_port: "<protocol>://<ip>:<port>" # When this parameter is set all bridge logs will be redirected to <ip>:<port> address.
