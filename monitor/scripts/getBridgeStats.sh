@@ -42,7 +42,7 @@ if /usr/local/bin/docker-compose ps | grep -q -i 'monitor'; then
       docker run --rm --env-file $file -v $(pwd)/${RESPONSESDIR}:/mono/monitor/responses \
         ${alist:+"-v"} ${alist:+"$al_param"} ${blist:+"-v"} ${blist:+"$bl_param"} \
         -v $(pwd)/${CACHEDIR}/${bridgename}:/mono/monitor/cache/${bridgename} \
-        --name ${containername} poanetwork/tokenbridge-monitor:${IMAGETAG} \
+        --name ${containername} gnosischain/tokenbridge-monitor:${IMAGETAG} \
         /bin/bash -c 'yarn check-all'
       shasum -a 256 -s -c ${checksumfile}
       if [ "$?" == "0" ]; then

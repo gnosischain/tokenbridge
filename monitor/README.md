@@ -149,7 +149,7 @@ yarn check-all
 Using Docker:
 ```
 docker run --rm --env-file .env -v $(pwd)/responses:/mono/monitor/responses \
-  poanetwork/tokenbridge-monitor:latest /bin/bash -c 'yarn check-all'
+  gnosischain/tokenbridge-monitor:latest /bin/bash -c 'yarn check-all'
 ```
 
 As soon as the process finishes, use the URL described above to get the statistic.

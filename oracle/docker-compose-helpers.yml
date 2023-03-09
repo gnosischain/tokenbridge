@@ -12,7 +12,7 @@ services:
   interestFetcher:
     cpus: 0.1
     mem_limit: 500m
-    image: poanetwork/tokenbridge-oracle:latest
+    image: ghcr.io/gnosischain/tokenbridge-oracle:latest
     env_file: ./.env
     environment:
       NODE_ENV: production
@@ -24,7 +24,7 @@ services:
   mevWatcher:
     cpus: 0.1
     mem_limit: 500m
-    image: poanetwork/tokenbridge-oracle:latest
+    image: ghcr.io/gnosischain/tokenbridge-oracle:latest
     env_file: ./.env
     environment:
       NODE_ENV: production
@@ -42,7 +42,7 @@ services:
   mevSender:
     cpus: 0.1
     mem_limit: 500m
-    image: poanetwork/tokenbridge-oracle:latest
+    image: ghcr.io/gnosischain/tokenbridge-oracle:latest
     env_file: ./.env
     environment:
       NODE_ENV: production

@@ -4,7 +4,7 @@ Please see the [Configuration](../CONFIGURATION.md) for additional configuration
 
 ## Prerequisites
 
-A functional Ubuntu 16.04 server launched using a trusted hosting provider. For more information, see our tutorials on [setting up a validator node on AWS](https://github.com/poanetwork/wiki/wiki/Validator-Node-on-AWS) or [setting up on non-AWS](https://github.com/poanetwork/wiki/wiki/Validator-Node-Non-AWS).
+A functional Ubuntu 16.04 server launched using a trusted hosting provider. For more information, see our tutorials on [setting up a validator node on AWS](https://github.com/gnosischain/wiki/wiki/Validator-Node-on-AWS) or [setting up on non-AWS](https://github.com/gnosischain/wiki/wiki/Validator-Node-Non-AWS).
   * Record the IP address (required for file setup).
   * Setup ssh access to your node via public+private keys (using passwords is less secure). 
   * When creating the node, set a meaningful `hostname` that can identify you (e.g. `validator-0x...`).
@@ -13,7 +13,7 @@ A functional Ubuntu 16.04 server launched using a trusted hosting provider. For 
 
 1. Clone this repository and go to the `deployment` folder
 ```
-git clone --recursive https://github.com/poanetwork/tokenbridge
+git clone --recursive https://github.com/gnosischain/tokenbridge
 cd tokenbridge/deployment
 ```
 2. Create the file `hosts.yml` from `hosts.yml.example`

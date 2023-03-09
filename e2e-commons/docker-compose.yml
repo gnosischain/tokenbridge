@@ -28,7 +28,7 @@ services:
     networks:
       - ultimate
   oracle-erc20-native:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-oracle:${ORACLE_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-oracle:${ORACLE_TAG:-local}
     env_file: ../e2e-commons/components-envs/oracle-erc20-native.env
     environment:
     - NODE_ENV=production
@@ -39,7 +39,7 @@ services:
     networks:
       - ultimate
   oracle-amb:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-oracle:${ORACLE_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-oracle:${ORACLE_TAG:-local}
     build:
       context: ..
       dockerfile: oracle/Dockerfile
@@ -53,7 +53,7 @@ services:
     networks:
       - ultimate
   alm:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-alm:${ALM_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-alm:${ALM_TAG:-local}
     build:
       context: ..
       dockerfile: alm/Dockerfile
@@ -63,7 +63,7 @@ services:
     networks:
       - ultimate
   monitor-erc20-native:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-monitor:${MONITOR_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-monitor:${MONITOR_TAG:-local}
     env_file: ../e2e-commons/components-envs/monitor-erc20-native.env
     entrypoint: yarn check-and-start
     ports:
@@ -71,7 +71,7 @@ services:
     networks:
       - ultimate
   monitor-amb:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-monitor:${MONITOR_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-monitor:${MONITOR_TAG:-local}
     build:
       context: ..
       dockerfile: monitor/Dockerfile
@@ -82,7 +82,7 @@ services:
     networks:
       - ultimate
   e2e:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-e2e:${E2E_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-e2e:${E2E_TAG:-local}
     build:
       context: ..
       dockerfile: Dockerfile.e2e
@@ -90,12 +90,12 @@ services:
     networks:
       - ultimate
   blocks:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-e2e:${E2E_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-e2e:${E2E_TAG:-local}
     entrypoint: node e2e-commons/scripts/blocks.js
     networks:
       - ultimate
   molecule_runner:
-    image: ${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-molecule_runner:${MOLECULE_RUNNER_TAG:-local}
+    image: ghcr.io/gnosischain/${DOCKER_IMAGE_BASE:-tokenbridge}/tokenbridge-e2e-molecule_runner:${MOLECULE_RUNNER_TAG:-local}
     build:
       context: ..
       dockerfile: deployment-e2e/Dockerfile

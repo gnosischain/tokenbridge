@@ -211,7 +211,7 @@ jobs:
       - name: Pull e2e oracle image
         run: |
          docker-compose -f ./e2e-commons/docker-compose.yml pull oracle-amb
-         docker tag ${DOCKER_PULL_IMAGE_BASE}/tokenbridge-e2e-oracle:${ORACLE_TAG} poanetwork/tokenbridge-oracle:latest
+         docker tag ${DOCKER_PULL_IMAGE_BASE}/tokenbridge-e2e-oracle:${ORACLE_TAG} gnosischain/tokenbridge-oracle:latest
       - name: Deploy oracle
         run: deployment-e2e/molecule.sh ultimate-${{ matrix.task }}
       - name: Reset docker socket permissions

@@ -2,7 +2,7 @@
 version: '2.4'
 services:
   monitor:
-    image: poanetwork/tokenbridge-monitor:latest
+    image: ghcr.io/gnosischain/tokenbridge-monitor:latest
     ports:
       - "${MONITOR_PORT}:${MONITOR_PORT}"
     env_file: ./.env

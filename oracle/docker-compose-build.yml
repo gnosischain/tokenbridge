@@ -2,7 +2,7 @@
 version: '2.4'
 services:
   oracle:
-    image: poanetwork/tokenbridge-oracle
+    image: ghcr.io/gnosischain/tokenbridge-oracle
     build:
       context: ..
       dockerfile: ./oracle/Dockerfile

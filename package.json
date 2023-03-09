@@ -2,7 +2,7 @@
   "name": "tokenbridge",
   "version": "0.0.1",
   "description": "Monorepository for TokenBridge",
-  "repository": "https://github.com/poanetwork/tokenbridge.git",
+  "repository": "https://github.com/gnosischain/tokenbridge.git",
   "author": "rzadp <przemek@ethworks.io>",
   "license": "MIT",
   "private": true,

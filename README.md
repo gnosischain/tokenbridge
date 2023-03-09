@@ -1,4 +1,4 @@
-![tokenbridge](https://github.com/poanetwork/tokenbridge/workflows/tokenbridge/badge.svg?branch=master)
+![tokenbridge](https://github.com/gnosischain/tokenbridge/workflows/tokenbridge/badge.svg?branch=master)
 [![Gitter](https://badges.gitter.im/poanetwork/poa-bridge.svg)](https://gitter.im/poanetwork/poa-bridge?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![License: LGPL v3.0](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 
@@ -30,7 +30,7 @@ Sub-repositories maintained within this monorepo are listed below.
 | [ALM](alm/README.md) | DApp interface tool for AMB Live Monitoring |
 | [Burner-wallet-plugin](burner-wallet-plugin/README.md) | TokenBridge Burner Wallet 2 Plugin |
 
-Additionally there are [Smart Contracts](https://github.com/poanetwork/tokenbridge-contracts) used to manage bridge validators, collect signatures, and confirm asset relay and disposal.
+Additionally there are [Smart Contracts](https://github.com/gnosischain/tokenbridge-contracts) used to manage bridge validators, collect signatures, and confirm asset relay and disposal.
 
 ## Available deployments
 
@@ -61,7 +61,7 @@ The POA TokenBridge provides four operational modes:
 
 Clone the repository:
 ```bash
-git clone https://github.com/poanetwork/tokenbridge
+git clone https://github.com/gnosischain/tokenbridge
 ```
 
 If there is no need to build docker images for the TokenBridge components (oracle, monitor), initialize submodules, install dependencies, compile the Smart Contracts:
