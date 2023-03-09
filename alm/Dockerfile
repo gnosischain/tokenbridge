@@ -31,7 +31,7 @@ WORKDIR /mono/alm
 RUN yarn run build
 
 
-FROM node:12 as alm-production
+FROM node:14 as alm-production
 RUN yarn global add serve
 WORKDIR /app
 COPY --from=alm-builder /mono/alm/build .
