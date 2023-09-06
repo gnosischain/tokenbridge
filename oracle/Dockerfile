@@ -13,9 +13,13 @@ RUN npm run compile
 
 FROM node:12
 
-RUN apt-get update && \
-    apt-get install -y build-essential libc6-dev libc6-dev-i386 wget && \
-    apt-get clean
+RUN echo "deb http://archive.debian.org/debian stretch main" > /etc/apt/sources.list
+RUN apt-get update
+RUN apt-get install -y build-essential
+RUN apt-get install -y libc6-dev
+RUN apt-get install -y libc6-dev-i386
+RUN apt-get install -y wget
+RUN apt-get clean
 
 WORKDIR /mono
 COPY package.json .

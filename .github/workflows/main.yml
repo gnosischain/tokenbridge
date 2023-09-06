@@ -1,13 +1,11 @@
 name: tokenbridge
 
-on:
-  workflow_dispatch:
-    branches: [develop]
+on: [push]
 
 env:
   DOCKER_REGISTRY: docker.pkg.github.com
-  DOCKER_PULL_REPO: poanetwork/tokenbridge
-  DOCKER_PULL_IMAGE_BASE: docker.pkg.github.com/poanetwork/tokenbridge
+  DOCKER_REPO: gnosischain/tokenbridge
+  DOCKER_IMAGE_BASE: docker.pkg.github.com/gnosischain/tokenbridge
 
 jobs:
   initialize:
@@ -79,7 +77,7 @@ jobs:
       - name: Rebuild and push updated images
         run: |
           function check_if_image_exists() {
-            curl -fsSlL "https://${{ github.actor }}:${{ github.token }}@${DOCKER_REGISTRY}/v2/${DOCKER_PULL_REPO}/tokenbridge-e2e-$1/manifests/$2" > /dev/null
+            curl -fsSlL "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@${DOCKER_REGISTRY}/v2/${DOCKER_REPO}/tokenbridge-e2e-$1/manifests/$2" > /dev/null
           }
           updated=()
           if ! check_if_image_exists e2e ${E2E_TAG};         then updated+=("e2e"); fi
@@ -89,7 +87,7 @@ jobs:
           if [ ${#updated[@]} -gt 0 ]; then
             echo "Updated services: ${updated[@]}"
             cd e2e-commons
-            docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ github.token }}
+            docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker-compose build ${updated[@]}
             docker-compose push ${updated[@]}
           else
@@ -106,13 +104,13 @@ jobs:
       - name: Rebuild and push molecule runner e2e image
         run: |
           function check_if_image_exists() {
-            curl -fsSlL "https://${{ github.actor }}:${{ github.token }}@${DOCKER_REGISTRY}/v2/${DOCKER_PULL_REPO}/tokenbridge-e2e-$1/manifests/$2" > /dev/null
+            curl -fsSlL "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@${DOCKER_REGISTRY}/v2/${DOCKER_REPO}/tokenbridge-e2e-$1/manifests/$2" > /dev/null
           }
           if check_if_image_exists molecule_runner ${MOLECULE_RUNNER_TAG}; then
             echo "Image already exists"
           else
             cd e2e-commons
-            docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ github.token }}
+            docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker-compose build molecule_runner
             docker-compose push molecule_runner
           fi
@@ -148,7 +146,7 @@ jobs:
             contracts/build
           key: ${{ needs.initialize.outputs.cache_key }}
       - name: Login to docker registry
-        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ github.token }}
+        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - name: yarn run ${{ matrix.task }}
         run: ${{ !matrix.use-cache || steps.cache-repo.outputs.cache-hit }} && yarn run ${{ matrix.task }}
       - name: Upload logs
@@ -173,7 +171,7 @@ jobs:
       - name: Evaluate e2e molecule runner tag
         run: echo "MOLECULE_RUNNER_TAG=${{ hashFiles('./deployment-e2e/Dockerfile') }}" >> $GITHUB_ENV
       - name: Login to docker registry
-        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ github.token }}
+        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - run: deployment-e2e/molecule.sh ${{ matrix.task }}
   ultimate:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags') || contains(github.event.head_commit.message, 'ultimate')
@@ -205,13 +203,13 @@ jobs:
             contracts/build
           key: ${{ needs.initialize.outputs.cache_key }}
       - name: Login to docker registry
-        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ github.token }}
+        run: docker login ${DOCKER_REGISTRY} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy contracts
         run: ${{ steps.cache-repo.outputs.cache-hit }} && e2e-commons/up.sh deploy generate-amb-tx blocks
       - name: Pull e2e oracle image
         run: |
          docker-compose -f ./e2e-commons/docker-compose.yml pull oracle-amb
-         docker tag ${DOCKER_PULL_IMAGE_BASE}/tokenbridge-e2e-oracle:${ORACLE_TAG} gnosischain/tokenbridge-oracle:latest
+         docker tag ${DOCKER_IMAGE_BASE}/tokenbridge-e2e-oracle:${ORACLE_TAG} gnosischain/tokenbridge-oracle:latest
       - name: Deploy oracle
         run: deployment-e2e/molecule.sh ultimate-${{ matrix.task }}
       - name: Reset docker socket permissions
