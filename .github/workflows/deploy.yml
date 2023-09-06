@@ -11,8 +11,9 @@ name: Deploy
 #   # Launches build when release is published
 #   release:
 #     types: [published]
-on: [push]
-
+on: 
+  workflow_dispatch:
+    branches: [develop]
 jobs:
   initialize:
     runs-on: ubuntu-latest
