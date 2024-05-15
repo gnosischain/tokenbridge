@@ -18,7 +18,7 @@ function makeCall(argNames) {
       return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
     })
     const { blockNumber, ...opts } = zipToObject(argNames, args)
-
+    
     if (blockNumber && toBN(blockNumber).gt(toBN(foreignBlock.number))) {
       return [false, ASYNC_CALL_ERRORS.BLOCK_IS_IN_THE_FUTURE]
     }
@@ -27,15 +27,18 @@ function makeCall(argNames) {
     if (!opts.gas || toBN(opts.gas).gt(toBN(ASYNC_ETH_CALL_MAX_GAS_LIMIT))) {
       opts.gas = ASYNC_ETH_CALL_MAX_GAS_LIMIT
     }
-
+  
     return web3.eth
       .call(opts, blockNumber || foreignBlock.number)
       .then(result => [true, web3.eth.abi.encodeParameter('bytes', result)])
       .catch(e => {
+  
         if (isRevertError(e)) {
+          logger.debug("Reverted error ")
           return [false, ASYNC_CALL_ERRORS.REVERT]
         }
-        throw e
+        return [false, ASYNC_CALL_ERRORS.NOT_FOUND ]
+       // throw e
       })
   }
 }

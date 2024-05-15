@@ -73,6 +73,7 @@ function processInformationRequestsBuilder(config) {
     rootLogger.debug(`Processing ${informationRequests.length} UserRequestForInformation events`)
     const callbacks = informationRequests
       .map(informationRequest => async () => {
+      
         const { messageId, requestSelector, data } = informationRequest.returnValues
 
         const logger = rootLogger.child({
@@ -84,7 +85,7 @@ function processInformationRequestsBuilder(config) {
 
         if (!asyncCallMethod) {
           logger.warn({ requestSelector }, 'Unknown async request selector received')
-          return
+          return [null]
         }
         logger.info({ requestSelector, method: asyncCallMethod, data }, 'Processing async request')
 
@@ -94,9 +95,10 @@ function processInformationRequestsBuilder(config) {
             throw e
           }
           logger.error({ error: e.message }, 'Unknown error during async call execution')
-          throw e
+          return [null]
+          // throw e
         })
-        if (result.length > 2 + MAX_ASYNC_CALL_RESULT_LENGTH * 2) {
+        if (result && result.length > 2 + MAX_ASYNC_CALL_RESULT_LENGTH * 2) {
           status = false
           result = ASYNC_CALL_ERRORS.RESULT_IS_TOO_LONG
         }
@@ -130,7 +132,8 @@ function processInformationRequestsBuilder(config) {
             return
           } else {
             logger.error(e, 'Unknown error while processing transaction')
-            throw e
+            return [null]
+            // throw e
           }
         }
 
