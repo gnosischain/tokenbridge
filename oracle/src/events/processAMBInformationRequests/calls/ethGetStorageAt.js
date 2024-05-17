@@ -3,9 +3,14 @@ const { toBN } = require('web3').utils
 const { ASYNC_CALL_ERRORS } = require('../../../utils/constants')
 
 async function call(web3, data, foreignBlock) {
-  const { 0: address, 1: slot } = web3.eth.abi.decodeParameters(['address', 'bytes32'], data).catch(() => {
+  let address, slot
+  try{
+  const decoded = web3.eth.abi.decodeParameters(['address', 'bytes32'], data)
+  address = decoded[0]
+  slot = decoded[1]
+  }catch{() => {
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  })
+  }}
 
   const value = await web3.eth.getStorageAt(address, slot, foreignBlock.number)
 

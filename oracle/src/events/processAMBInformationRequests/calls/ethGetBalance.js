@@ -3,9 +3,12 @@ const { toBN } = require('web3').utils
 const { ASYNC_CALL_ERRORS } = require('../../../utils/constants')
 
 async function call(web3, data, foreignBlock) {
-  const address = web3.eth.abi.decodeParameter('address', data).catch(() => {
+  let address
+  try{
+    address = web3.eth.abi.decodeParameter('address', data)
+  }catch{() => {
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  })
+  }}
 
   const balance = await web3.eth.getBalance(address, foreignBlock.number)
 

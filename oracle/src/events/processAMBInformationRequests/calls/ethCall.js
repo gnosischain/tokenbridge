@@ -14,9 +14,13 @@ const argTypes = {
 function makeCall(argNames) {
   return async function(web3, data, foreignBlock) {
     const types = argNames.map(name => argTypes[name])
-    const args = web3.eth.abi.decodeParameters(types, data).catch(() => {
+    let args
+    try{
+      args = web3.eth.abi.decodeParameters(types, data)
+    } catch{() => {
       return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-    })
+    }}
+
     const { blockNumber, ...opts } = zipToObject(argNames, args)
     
     if (blockNumber && toBN(blockNumber).gt(toBN(foreignBlock.number))) {
