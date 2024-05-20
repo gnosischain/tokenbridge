@@ -4,30 +4,46 @@ const { ASYNC_CALL_ERRORS } = require('../../../utils/constants')
 
 async function call(web3, data, foreignBlock) {
   let address, slot
+  let value
   try{
   const decoded = web3.eth.abi.decodeParameters(['address', 'bytes32'], data)
   address = decoded[0]
   slot = decoded[1]
-  }catch{() => {
+  }catch{
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  }}
+  }
 
-  const value = await web3.eth.getStorageAt(address, slot, foreignBlock.number)
+  try{
+    value = await web3.eth.getStorageAt(address, slot, foreignBlock.number)
+  }catch{
+    return [false,ASYNC_CALL_ERRORS.FAIL_TO_GET_STORAGE]
+  }
 
   return [true, web3.eth.abi.encodeParameter('bytes32', value)]
 }
 
 async function callArchive(web3, data, foreignBlock) {
-  const { 0: address, 1: slot, 2: blockNumber } = web3.eth.abi.decodeParameters(['address', 'bytes32', 'uint256'], data).catch(() => {
+  let address, slot, blockNumber
+  let value
+  try{
+    const decoded = web3.eth.abi.decodeParameters(['address', 'bytes32', 'uint256'], data)
+    address = decoded[0]
+    slot = decoded[1]
+    blockNumber = decoded[2]
+  }catch{
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  })
+  }
 
   if (toBN(blockNumber).gt(toBN(foreignBlock.number))) {
     return [false, ASYNC_CALL_ERRORS.BLOCK_IS_IN_THE_FUTURE]
   }
 
-  const value = await web3.eth.getStorageAt(address, slot, blockNumber)
-
+  try{
+    value = await web3.eth.getStorageAt(address, slot, blockNumber)
+  }catch{
+    return [false,ASYNC_CALL_ERRORS.FAIL_TO_GET_STORAGE]
+  }
+  
   return [true, web3.eth.abi.encodeParameter('bytes32', value)]
 }
 

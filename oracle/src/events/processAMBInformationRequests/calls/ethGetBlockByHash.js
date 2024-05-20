@@ -3,13 +3,15 @@ const { serializeBlock } = require('./serializers')
 
 async function call(web3, data, foreignBlock) {
   let blockHash
+  
   try{
     blockHash = web3.eth.abi.decodeParameter('bytes32', data)
-  }catch{() => {
+  }catch{
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  }}
-
-  const block = await web3.eth.getBlock(blockHash)
+  }
+  
+    const block = await web3.eth.getBlock(blockHash)
+ 
 
   if (block === null || block.number > foreignBlock.number) {
     return [false, ASYNC_CALL_ERRORS.NOT_FOUND]

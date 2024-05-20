@@ -73,7 +73,7 @@ function processInformationRequestsBuilder(config) {
     rootLogger.debug(`Processing ${informationRequests.length} UserRequestForInformation events`)
     const callbacks = informationRequests
       .map(informationRequest => async () => {
-      
+        
         const { messageId, requestSelector, data } = informationRequest.returnValues
 
         const logger = rootLogger.child({
@@ -85,7 +85,7 @@ function processInformationRequestsBuilder(config) {
 
         if (!asyncCallMethod) {
           logger.warn({ requestSelector }, 'Unknown async request selector received')
-          return [null]
+          return
         }
         logger.info({ requestSelector, method: asyncCallMethod, data }, 'Processing async request')
 
@@ -95,7 +95,7 @@ function processInformationRequestsBuilder(config) {
             throw e
           }
           logger.error({ error: e.message }, 'Unknown error during async call execution')
-          return [null]
+          return [false,ASYNC_CALL_ERRORS.UNKNOWN_ERROR]
           // throw e
         })
         if (result && result.length > 2 + MAX_ASYNC_CALL_RESULT_LENGTH * 2) {
@@ -103,7 +103,10 @@ function processInformationRequestsBuilder(config) {
           result = ASYNC_CALL_ERRORS.RESULT_IS_TOO_LONG
         }
         logger.info({ requestSelector, method: asyncCallMethod, status, result }, 'Request result obtained')
-
+        
+        // TBD: Not push the false tx to queue
+        // if(!status) return
+        
         let gasEstimate
         try {
           logger.debug('Estimate gas')
@@ -132,19 +135,20 @@ function processInformationRequestsBuilder(config) {
             return
           } else {
             logger.error(e, 'Unknown error while processing transaction')
-            return [null]
+            return
             // throw e
           }
         }
-
-        const confirmationData = home.bridgeContract.methods.confirmInformation(messageId, status, result).encodeABI()
-        txToSend.push({
-          data: confirmationData,
-          gasEstimate,
-          extraGas: EXTRA_GAS_ABSOLUTE,
-          transactionReference: informationRequest.transactionHash,
-          to: config.home.bridgeAddress
-        })
+        if (gasEstimate!=null){
+          const confirmationData = home.bridgeContract.methods.confirmInformation(messageId, status, result).encodeABI()
+          txToSend.push({
+            data: confirmationData,
+            gasEstimate,
+            extraGas: EXTRA_GAS_ABSOLUTE,
+            transactionReference: informationRequest.transactionHash,
+            to: config.home.bridgeAddress
+          })
+        }
       })
       .map(promise => limit(promise))
 

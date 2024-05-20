@@ -17,9 +17,9 @@ function makeCall(argNames) {
     let args
     try{
       args = web3.eth.abi.decodeParameters(types, data)
-    } catch{() => {
+    } catch{
       return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-    }}
+    }
 
     const { blockNumber, ...opts } = zipToObject(argNames, args)
     

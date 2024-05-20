@@ -281,15 +281,17 @@ async function main({ sendToQueue }) {
         }
 
         job = await processAMBInformationRequests(events)
-        if (job === null) {
+        if(job === null){
+          logger.debug("No job to send")
           return
         }
+    
       } else {
         job = await processEvents(events)
       }
-      logger.info('Transactions to send:', job.length)
 
-      if (job.length) {
+      if (job!=null && job.length > 0){
+        logger.info('Transactions to send:', job.length)
         await sendToQueue(job)
       }
       if (reprocessingOptions.enabled) {

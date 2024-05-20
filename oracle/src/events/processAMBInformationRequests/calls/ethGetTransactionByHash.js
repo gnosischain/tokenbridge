@@ -5,9 +5,9 @@ async function call(web3, data, foreignBlock) {
   let hash
   try{
     hash = web3.eth.abi.decodeParameter('bytes32', data)
-  }catch{() => {
+  }catch{
     return [false, ASYNC_CALL_ERRORS.INPUT_DATA_HAVE_INCORRECT_FORMAT]
-  }}
+  }
 
   const tx = await web3.eth.getTransaction(hash)
 
