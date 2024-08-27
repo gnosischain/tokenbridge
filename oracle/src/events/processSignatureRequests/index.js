@@ -20,7 +20,9 @@ function processSignatureRequestsBuilder(config) {
     const txToSend = []
 
     if (expectedMessageLength === null) {
-      expectedMessageLength = await bridgeContract.methods.requiredMessageLength().call()
+      // note: requiredMessageLength() is removed as a public function after Gnosis-Hashi integration
+      // expectedMessageLength = await bridgeContract.methods.requiredMessageLength().call()
+      expectedMessageLength = 104
     }
 
     if (validatorContract === null) {
@@ -30,18 +32,21 @@ function processSignatureRequestsBuilder(config) {
     rootLogger.debug(`Processing ${signatureRequests.length} SignatureRequest events`)
     const callbacks = signatureRequests
       .map(signatureRequest => async () => {
-        const { recipient, value } = signatureRequest.returnValues
+        const { recipient, value, nonce } = signatureRequest.returnValues
 
         const logger = rootLogger.child({
           eventTransactionHash: signatureRequest.transactionHash
         })
 
-        logger.info({ sender: recipient, value }, `Processing signatureRequest ${signatureRequest.transactionHash}`)
+        logger.info(
+          { sender: recipient, value, nonce },
+          `Processing signatureRequest ${signatureRequest.transactionHash}`
+        )
 
         const message = createMessage({
           recipient,
           value,
-          transactionHash: signatureRequest.transactionHash,
+          transactionHash: nonce,
           bridgeAddress: config.foreign.bridgeAddress,
           expectedMessageLength
         })

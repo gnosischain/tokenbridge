@@ -4,9 +4,9 @@ const logger = require('../../services/logger').child({
   module: 'processAffirmationRequests:estimateGas'
 })
 
-async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, txHash, address }) {
+async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, nonce, address }) {
   try {
-    return await homeBridge.methods.executeAffirmation(recipient, value, txHash).estimateGas({
+    return await homeBridge.methods.executeAffirmation(recipient, value, nonce).estimateGas({
       from: address
     })
   } catch (e) {
@@ -14,7 +14,11 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
       throw e
     }
 
-    const messageHash = web3.utils.soliditySha3(recipient, value, txHash)
+    // TODO: check isApprovedByHashi(hashMsg)
+    // const isApprovedByHashi =  await homeBridge.methods.isApprovedByHashi(messageHash)
+    // if isApprovedByHashi, continue
+
+    const messageHash = web3.utils.soliditySha3(recipient, value, nonce)
     const senderHash = web3.utils.soliditySha3(address, messageHash)
 
     // Check if minimum number of validations was already reached

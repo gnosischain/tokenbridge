@@ -24,13 +24,16 @@ function processAffirmationRequestsBuilder(config) {
     rootLogger.debug(`Processing ${affirmationRequests.length} AffirmationRequest events`)
     const callbacks = affirmationRequests
       .map(affirmationRequest => async () => {
-        const { recipient, value } = affirmationRequest.returnValues
+        const { recipient, value, nonce } = affirmationRequest.returnValues
 
         const logger = rootLogger.child({
           eventTransactionHash: affirmationRequest.transactionHash
         })
 
-        logger.info({ sender: recipient, value }, `Processing affirmationRequest ${affirmationRequest.transactionHash}`)
+        logger.info(
+          { sender: recipient, value, nonce },
+          `Processing affirmationRequest ${affirmationRequest.transactionHash}`
+        )
 
         let gasEstimate
         try {
@@ -41,7 +44,7 @@ function processAffirmationRequestsBuilder(config) {
             validatorContract,
             recipient,
             value,
-            txHash: affirmationRequest.transactionHash,
+            nonce,
             address: config.validatorAddress
           })
           logger.debug({ gasEstimate }, 'Gas estimated')
@@ -65,9 +68,7 @@ function processAffirmationRequestsBuilder(config) {
           }
         }
 
-        const data = bridgeContract.methods
-          .executeAffirmation(recipient, value, affirmationRequest.transactionHash)
-          .encodeABI()
+        const data = bridgeContract.methods.executeAffirmation(recipient, value, nonce).encodeABI()
         txToSend.push({
           data,
           gasEstimate,
