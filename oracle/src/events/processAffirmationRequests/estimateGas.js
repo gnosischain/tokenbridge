@@ -14,12 +14,16 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
       throw e
     }
 
-    // TODO: check isApprovedByHashi(hashMsg)
-    // const isApprovedByHashi =  await homeBridge.methods.isApprovedByHashi(messageHash)
-    // if isApprovedByHashi, continue
+    // // TODO: check isApprovedByHashi(hashMsg)
 
     const messageHash = web3.utils.soliditySha3(recipient, value, nonce)
     const senderHash = web3.utils.soliditySha3(address, messageHash)
+
+    // Check if msg is approved by Hashi
+    const isApprovedByHashi = await homeBridge.methods.isApprovedByHashi(messageHash)
+    if (!isApprovedByHashi) {
+      throw new NotApprovedByHashiError(e.message)
+    }
 
     // Check if minimum number of validations was already reached
     logger.debug('Check if minimum number of validations was already reached')
