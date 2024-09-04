@@ -1,97 +1,115 @@
 ---
 version: '2.4'
 services:
-  rabbit:
-    extends:
-      file: docker-compose.yml
-      service: rabbit
+  rabbit_amb:
+    cpus: 0.3
+    mem_limit: 500m
+    environment: [ 'RABBITMQ_NODENAME=node@rabbit' ]
+    hostname: rabbit
+    image: rabbitmq:3
     networks:
-      - net_rabbit_bridge_information
-  redis:
-    extends:
-      file: docker-compose.yml
-      service: redis
-    networks:
-      - net_db_bridge_information
-  bridge_request:
-    extends:
-      file: docker-compose.yml
-      service: bridge_request
-    networks:
-      - net_db_bridge_request
-      - net_rabbit_bridge_request
-  bridge_collected:
-    extends:
-      file: docker-compose.yml
-      service: bridge_collected
-    networks:
-      - net_db_bridge_request
-      - net_rabbit_bridge_request
-  bridge_affirmation:
-    extends:
-      file: docker-compose.yml
-      service: bridge_affirmation
-    networks:
-      - net_db_bridge_request
-      - net_rabbit_bridge_request
-  bridge_information:
+      - net_rabbit_bridge_request_amb
+      - net_rabbit_bridge_affirmation_amb
+      - net_rabbit_bridge_senderhome_amb
+      - net_rabbit_bridge_senderforeign_amb
+    restart: unless-stopped
+    volumes: [ '~/bridge_data/rabbitmq_amb:/var/lib/rabbitmq/mnesia' ]
+  redis_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: poanetwork/tokenbridge-oracle:latest
-    env_file: ./.env
+    command: [ redis-server, --appendonly, 'yes' ]
+    hostname: redis
+    image: redis:4
+    networks:
+      - net_db_bridge_request_amb
+      - net_db_bridge_affirmation_amb
+      - net_db_bridge_senderhome_amb
+      - net_db_bridge_senderforeign_amb
+      - net_db_bridge_shutdown_amb
+    restart: unless-stopped
+    volumes: [ '~/bridge_data/redis_amb:/data' ]
+    ports:
+      - "6379:6379"
+  bridge_request_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge
+    env_file: ./.env.amb
+    environment:
+      - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
+    restart: unless-stopped
+    entrypoint: yarn watcher:signature-request
+    networks:
+      - net_db_bridge_request_amb
+      - net_rabbit_bridge_request_amb
+  bridge_affirmation_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge
+    env_file: ./.env.amb
     environment:
       - NODE_ENV=production
       - ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}
     restart: unless-stopped
-    entrypoint: yarn watcher:information-request
+    entrypoint: yarn watcher:affirmation-request
     networks:
-      - net_db_bridge_information
-      - net_rabbit_bridge_information
-  bridge_senderhome:
-    extends:
-      file: docker-compose.yml
-      service: bridge_senderhome
+      - net_db_bridge_affirmation_amb
+      - net_rabbit_bridge_affirmation_amb
+  bridge_senderhome_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge
+    env_file: ./.env.amb
+    environment:
+      - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
+    restart: unless-stopped
+    entrypoint: yarn sender:home
     networks:
-      - net_db_bridge_request
-      - net_rabbit_bridge_request
-  bridge_senderforeign:
-    extends:
-      file: docker-compose.yml
-      service: bridge_senderforeign
+      - net_db_bridge_senderhome_amb
+      - net_rabbit_bridge_senderhome_amb
+  bridge_senderforeign_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge
+    env_file: ./.env.amb
+    environment:
+      - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
+    restart: unless-stopped
+    entrypoint: yarn sender:foreign
     networks:
-      - net_db_bridge_request
-      - net_rabbit_bridge_request
-  bridge_shutdown:
-    extends:
-      file: docker-compose.yml
-      service: bridge_shutdown
+      - net_db_bridge_senderforeign_amb
+      - net_rabbit_bridge_senderforeign_amb
+  bridge_shutdown_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge
+    env_file: ./.env.amb
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    entrypoint: yarn manager:shutdown
     networks:
-      - net_db_bridge_shutdown
+      - net_db_bridge_shutdown_amb
 
 networks:
-  net_db_bridge_request:
+  net_db_bridge_request_amb:
     driver: bridge
-  net_db_bridge_collected:
+  net_db_bridge_affirmation_amb:
     driver: bridge
-  net_db_bridge_affirmation:
+  net_db_bridge_senderhome_amb:
     driver: bridge
-  net_db_bridge_information:
+  net_db_bridge_senderforeign_amb:
     driver: bridge
-  net_db_bridge_senderhome:
+  net_db_bridge_shutdown_amb:
     driver: bridge
-  net_db_bridge_senderforeign:
+  net_rabbit_bridge_request_amb:
     driver: bridge
-  net_rabbit_bridge_request:
+  net_rabbit_bridge_affirmation_amb:
     driver: bridge
-  net_db_bridge_shutdown:
+  net_rabbit_bridge_senderhome_amb:
     driver: bridge
-  net_rabbit_bridge_collected:
-    driver: bridge
-  net_rabbit_bridge_affirmation:
-    driver: bridge
-  net_rabbit_bridge_information:
-    driver: bridge
-  net_rabbit_bridge_senderhome:
-    driver: bridge
-  net_rabbit_bridge_senderforeign:
+  net_rabbit_bridge_senderforeign_amb:
     driver: bridge
