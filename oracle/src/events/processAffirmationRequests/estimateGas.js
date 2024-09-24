@@ -14,8 +14,6 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
       throw e
     }
 
-    // // TODO: check isApprovedByHashi(hashMsg)
-
     const messageHash = web3.utils.soliditySha3(recipient, value, nonce)
     const senderHash = web3.utils.soliditySha3(address, messageHash)
 
