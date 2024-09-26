@@ -3,7 +3,6 @@ FROM node:12 as contracts
 WORKDIR /mono
 COPY ./contracts /contracts-whole
 RUN mkdir contracts
-RUN ls contracts-whole
 RUN mv /contracts-whole/contracts/package.json /contracts
 RUN mv /contracts-whole/contracts/package-lock.json /contracts
 RUN npm install --only=prod
