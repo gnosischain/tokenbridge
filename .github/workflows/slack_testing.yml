@@ -1,0 +1,25 @@
+name: notification testing
+
+on:
+  workflow_dispatch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Send Slack notification
+        uses: ./.github/workflows/slack_release_notification.yml
+        with:
+          environment: Production
+          service: Tokenbridge Oracle
+          success: ${{ contains(join(needs.*.result, ','), 'success') }}
+          message: "Deploy service `Tokenbridge Oracle` version `${{ steps.get_tag.outputs.version }}`. Triggered by `${{ github.actor }}`."

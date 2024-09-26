@@ -60,7 +60,6 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout
         uses: actions/checkout@v2
 
