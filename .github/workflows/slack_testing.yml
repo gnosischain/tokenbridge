@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack notification
-        uses: ./.github/workflows/slack_release_notification.yml
+        uses: .github/workflows/slack_release_notification.yml
         with:
           environment: Production
           service: Tokenbridge Oracle
