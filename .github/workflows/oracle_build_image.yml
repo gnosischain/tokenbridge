@@ -2,7 +2,8 @@ name: Publish Oracle Docker Image From Release
 
 on:
   release:
-    types: [released]
+    types: 
+      - released
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
