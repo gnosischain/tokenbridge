@@ -1,10 +1,14 @@
 name: Publish Oracle Docker Image From Release
 
+# on:
+#   workflow_run:
+#     workflows: ["Create Github Release"] # Name of the triggering workflow
+#     types:
+#       - completed
 on:
-  workflow_run:
-    workflows: ["Create Github Release"] # Name of the triggering workflow
-    types:
-      - completed
+  push:
+    branches:
+      - master
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          repository: https://github.com/omni/tokenbridge-contracts
+          repository: gnosischain/tokenbridge-contracts
           path: ./contracts
           ref: 908a48107919d4ab127f9af07d44d47eac91547e
 
