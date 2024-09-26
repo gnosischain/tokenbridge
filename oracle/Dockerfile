@@ -7,12 +7,8 @@ COPY contracts/package.json contracts/package-lock.json ./contracts/
 WORKDIR /mono/contracts
 RUN npm install --only=prod
 
-# Step to resolve symbolic link before copying
-RUN cp -rL ./contracts ./resolved_contracts
-
-# Copy the resolved contracts directory
-COPY ./resolved_contracts/truffle-config.js ./
-COPY ./resolved_contracts/contracts ./contracts
+COPY ./contracts/truffle-config.js ./
+COPY ./contracts/contracts/ ./contracts
 RUN npm run compile
 
 FROM node:12
