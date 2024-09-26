@@ -1,24 +1,14 @@
 FROM node:12 as contracts
 
 WORKDIR /mono
-COPY ./contracts /contracts-whole
-RUN mkdir contracts
-RUN mv contracts-whole/package.json contracts
-RUN mv contracts-whole/package-lock.json contracts
+
+COPY contracts/package.json contracts/package-lock.json ./contracts/
+
+WORKDIR /mono/contracts
 RUN npm install --only=prod
-RUN mv contracts-whole/truffle-config.js contracts
-RUN mv contracts-whole/contracts/* contracts/
-#COPY ./contracts/package.json ./contracts/package-lock.json /contracts/
 
-# WORKDIR /mono/contracts
-# RUN npm install --only=prod
-
-#COPY ./contracts /contracts-whole
-#COPY ./contracts/truffle-config.js ./
-#RUN mv /mono/contracts-whole/truffle-config.js /mono/contracts
-#RUN mv /contracts-whole/truffle-config.js /mono/contracts
-#RUN mv /mono/contracts-whole/contracts /mono/contracts
-RUN rm -rf /contracts-whole
+COPY ./contracts/truffle-config.js ./
+COPY ./contracts/contracts ./contracts
 RUN npm run compile
 
 FROM node:12
@@ -45,4 +35,3 @@ COPY ./oracle ./oracle
 
 WORKDIR /mono/oracle
 CMD echo "To start a bridge process run:" \
-  "ORACLE_VALIDATOR_ADDRESS=<validator address> ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=<validator address private key> docker-compose up -d --build"
