@@ -3,11 +3,11 @@ FROM node:12 as contracts
 WORKDIR /mono
 COPY ./contracts /contracts-whole
 RUN mkdir contracts
-RUN mv /contracts-whole/contracts/package.json /contracts
-RUN mv /contracts-whole/contracts/package-lock.json /contracts
+RUN mv contracts-whole/package.json contracts
+RUN mv contracts-whole/package-lock.json contracts
 RUN npm install --only=prod
-RUN mv /contracts-whole/truffle-config.js /contracts
-RUN mv /contracts-whole/contracts/* /contracts/
+RUN mv contracts-whole/truffle-config.js contracts
+RUN mv contracts-whole/contracts/* contracts/
 #COPY ./contracts/package.json ./contracts/package-lock.json /contracts/
 
 # WORKDIR /mono/contracts
