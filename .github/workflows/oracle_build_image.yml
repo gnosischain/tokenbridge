@@ -1,9 +1,10 @@
 name: Publish Oracle Docker Image From Release
 
 on:
-  release:
-    types: 
-      - released
+  workflow_run:
+    workflows: ["Create Github Release"] # Name of the triggering workflow
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
