@@ -8,7 +8,9 @@ WORKDIR /mono/contracts
 RUN npm install --only=prod
 
 COPY ./contracts/truffle-config.js ./
-COPY ./contracts/contracts/ ./contracts
+COPY ./contracts /contracts-whole
+RUN mv /contracts-whole/contracts /contracts
+RUN rm -rf /contracts-whole
 RUN npm run compile
 
 FROM node:12
