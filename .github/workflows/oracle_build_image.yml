@@ -60,6 +60,10 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
+      # Step 1: Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v2
+
       - name: Send Slack notification
         uses: ./.github/workflows/slack_release_notification.yml
         with:
