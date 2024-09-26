@@ -2,7 +2,7 @@ FROM node:12 as contracts
 
 WORKDIR /mono
 
-COPY contracts/package.json contracts/package-lock.json ./contracts/
+COPY ./contracts/package.json ./contracts/package-lock.json /contracts/
 
 WORKDIR /mono/contracts
 RUN npm install --only=prod
