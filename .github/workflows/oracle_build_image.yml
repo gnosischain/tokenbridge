@@ -1,6 +1,5 @@
 name: Publish Oracle Docker Image From Release
 
-# Run on released
 on:
   release:
     types: [released]
@@ -8,6 +7,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -21,8 +21,9 @@ jobs:
       - name: Get current version tag
         id: get_tag
         run: |
-          echo "Current tag: $GITHUB_REF"
-          echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
+          git fetch --tags
+          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "::set-output name=version::$latest_tag"
 
       # Step 3: Login to Docker Hub
       - name: Login to Docker Hub
@@ -43,14 +44,15 @@ jobs:
           file: ./oracle/Dockerfile
           push: true
           tags: gnosischain/tokenbridge-oracle:${{ steps.get_tag.outputs.version }},gnosischain/tokenbridge-oracle:latest
+
   notify:
-    uses: ./.github/workflows/slack_release_notification.yml
-    if: ${{ always() }}
-    needs: deploy
-    secrets: 
-      RELEASES_SLACK_WEBHOOK_URL: ${{ secrets.RELEASES_SLACK_WEBHOOK_URL }}
-    with:
-      environment: Production
-      service: Tokenbridge Oracle
-      success: ${{ contains(join(needs.*.result, ','), 'success') }}
-      message: "deploy service `Tokenbridge Oracle` version `${{ steps.get_tag.outputs.version }}`. Triggered by `${{ github.actor }}`."
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        uses: ./.github/workflows/slack_release_notification.yml
+        with:
+          environment: Production
+          service: Tokenbridge Oracle
+          success: ${{ contains(join(needs.*.result, ','), 'success') }}
+          message: "Deploy service `Tokenbridge Oracle` version `${{ steps.get_tag.outputs.version }}`. Triggered by `${{ github.actor }}`."
