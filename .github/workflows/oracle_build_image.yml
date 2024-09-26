@@ -1,14 +1,10 @@
 name: Publish Oracle Docker Image From Release
 
-# on:
-#   workflow_run:
-#     workflows: ["Create Github Release"] # Name of the triggering workflow
-#     types:
-#       - completed
 on:
-  push:
-    branches:
-      - master
+  workflow_run:
+    workflows: ["Create Github Release"]
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +12,7 @@ concurrency:
 
 jobs:
   publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -59,6 +56,7 @@ jobs:
           tags: gnosischain/tokenbridge-oracle:${{ steps.get_tag.outputs.version }},gnosischain/tokenbridge-oracle:latest
 
   notify:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     needs: publish
     runs-on: ubuntu-latest
     steps:
