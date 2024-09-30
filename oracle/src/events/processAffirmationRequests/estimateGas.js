@@ -18,8 +18,9 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
     const senderHash = web3.utils.soliditySha3(address, messageHash)
 
     const isHashiMandatory = await homeBridge.methods.HASHI_IS_MANDATORY().call()
-    logger.debug('Hashi is mandatory: ', isHashiMandatory)
-    if (isHashiMandatory === true) {
+    const isHashiEnabled = await homeBridge.methods.HASHI_IS_ENABLED().call()
+
+    if (isHashiMandatory === true && isHashiEnabled === true) {
       // Check if msg is approved by Hashi
       const isApprovedByHashi = await homeBridge.methods.isApprovedByHashi(messageHash)
       if (!isApprovedByHashi) {
