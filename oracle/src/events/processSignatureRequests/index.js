@@ -3,7 +3,7 @@ const promiseLimit = require('promise-limit')
 const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
-const { createMessage } = require('../../utils/message')
+const { createxDAIMessage } = require('../../utils/message')
 const estimateGas = require('./estimateGas')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
@@ -43,10 +43,10 @@ function processSignatureRequestsBuilder(config) {
           `Processing signatureRequest ${signatureRequest.transactionHash}`
         )
 
-        const message = createMessage({
+        const message = createxDAIMessage({
           recipient,
           value,
-          transactionHash: nonce,
+          nonce,
           bridgeAddress: config.foreign.bridgeAddress,
           expectedMessageLength
         })
