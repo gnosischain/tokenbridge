@@ -3,7 +3,7 @@ const promiseLimit = require('promise-limit')
 const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
-const { createMessage } = require('../../utils/message')
+const { createxDAIMessage } = require('../../utils/message')
 const estimateGas = require('./estimateGas')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
@@ -20,7 +20,9 @@ function processSignatureRequestsBuilder(config) {
     const txToSend = []
 
     if (expectedMessageLength === null) {
-      expectedMessageLength = await bridgeContract.methods.requiredMessageLength().call()
+      // note: requiredMessageLength() is removed as a public function after Gnosis-Hashi integration
+      // expectedMessageLength = await bridgeContract.methods.requiredMessageLength().call()
+      expectedMessageLength = 104
     }
 
     if (validatorContract === null) {
@@ -30,18 +32,21 @@ function processSignatureRequestsBuilder(config) {
     rootLogger.debug(`Processing ${signatureRequests.length} SignatureRequest events`)
     const callbacks = signatureRequests
       .map(signatureRequest => async () => {
-        const { recipient, value } = signatureRequest.returnValues
+        const { recipient, value, nonce } = signatureRequest.returnValues
 
         const logger = rootLogger.child({
           eventTransactionHash: signatureRequest.transactionHash
         })
 
-        logger.info({ sender: recipient, value }, `Processing signatureRequest ${signatureRequest.transactionHash}`)
+        logger.info(
+          { sender: recipient, value, nonce },
+          `Processing signatureRequest ${signatureRequest.transactionHash}`
+        )
 
-        const message = createMessage({
+        const message = createxDAIMessage({
           recipient,
           value,
-          transactionHash: signatureRequest.transactionHash,
+          nonce,
           bridgeAddress: config.foreign.bridgeAddress,
           expectedMessageLength
         })

@@ -1,12 +1,18 @@
 const { HttpListProviderError } = require('../../services/HttpListProvider')
-const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  AlreadySignedError,
+  InvalidValidatorError,
+  NotApprovedByHashiError
+} = require('../../utils/errors')
 const logger = require('../../services/logger').child({
   module: 'processAffirmationRequests:estimateGas'
 })
+const { addToRetryQueue } = require('../../utils/sendToRetryQueue')
 
-async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, txHash, address }) {
+async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, nonce, address, transactionHash }) {
   try {
-    return await homeBridge.methods.executeAffirmation(recipient, value, txHash).estimateGas({
+    return await homeBridge.methods.executeAffirmation(recipient, value, nonce).estimateGas({
       from: address
     })
   } catch (e) {
@@ -14,8 +20,28 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
       throw e
     }
 
-    const messageHash = web3.utils.soliditySha3(recipient, value, txHash)
+    const messageHash = web3.utils.soliditySha3(recipient, value, nonce)
     const senderHash = web3.utils.soliditySha3(address, messageHash)
+
+    const isHashiMandatory = await homeBridge.methods.HASHI_IS_MANDATORY().call()
+    const isHashiEnabled = await homeBridge.methods.HASHI_IS_ENABLED().call()
+
+    logger.debug('Check if is approved by Hashi')
+    if (isHashiMandatory === true && isHashiEnabled === true) {
+      // Check if msg is approved by Hashi
+      const isApprovedByHashi = await homeBridge.methods.isApprovedByHashi(messageHash).call()
+
+      if (!isApprovedByHashi) {
+        await addToRetryQueue({
+          bridge: 'xdai',
+          transactionHash,
+          recipient,
+          value,
+          nonce
+        })
+        throw new NotApprovedByHashiError()
+      }
+    }
 
     // Check if minimum number of validations was already reached
     logger.debug('Check if minimum number of validations was already reached')

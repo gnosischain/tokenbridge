@@ -2,6 +2,28 @@ const assert = require('assert')
 const { toHex, numberToHex, padLeft } = require('web3').utils
 const { strip0x } = require('../../../commons')
 
+// after Hashi integration, transactionHash is replaced with nonce
+function createxDAIMessage({ recipient, value, nonce, bridgeAddress, expectedMessageLength }) {
+  recipient = strip0x(recipient)
+  assert.strictEqual(recipient.length, 20 * 2)
+
+  value = numberToHex(value)
+  value = padLeft(value, 32 * 2)
+
+  value = strip0x(value)
+  assert.strictEqual(value.length, 64)
+
+  nonce = strip0x(nonce)
+  assert.strictEqual(nonce.length, 32 * 2)
+
+  bridgeAddress = strip0x(bridgeAddress)
+  assert.strictEqual(bridgeAddress.length, 20 * 2)
+
+  const message = `0x${recipient}${value}${nonce}${bridgeAddress}`
+  assert.strictEqual(message.length, 2 + 2 * expectedMessageLength)
+  return message
+}
+
 function createMessage({ recipient, value, transactionHash, bridgeAddress, expectedMessageLength }) {
   recipient = strip0x(recipient)
   assert.strictEqual(recipient.length, 20 * 2)
@@ -102,6 +124,7 @@ function parseAMBHeader(message) {
 
 module.exports = {
   createMessage,
+  createxDAIMessage,
   parseMessage,
   signatureToVRS,
   packSignatures,
