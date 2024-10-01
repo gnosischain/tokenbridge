@@ -66,4 +66,4 @@ jobs:
       environment: Production
       service: Tokenbridge Oracle
       success: ${{ contains(join(needs.*.result, ','), 'success') }}
-      message: "Deploy service `Tokenbridge Oracle` version `${{ needs.publish.outputs.version }}`. Triggered by `${{ github.actor }}`."
+      message: "Released new docker image of `Tokenbridge Oracle` version `${{ needs.publish.outputs.version }}`. Triggered by `${{ github.actor }}`."
