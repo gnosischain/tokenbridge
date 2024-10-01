@@ -4,8 +4,9 @@
   become: true
   roles:
     - { role: oracle }
-- name: Install Monitor
-  hosts: monitor
-  become: true
-  roles:
-    - { role: monitor }
+# @TODO deprecated
+# - name: Install Monitor
+#   hosts: monitor
+#   become: true
+#   roles:
+#     - { role: monitor }

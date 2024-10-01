@@ -36,7 +36,15 @@ start(){
     cd $WORKDIR
     sudo -u "{{ compose_service_user }}" /usr/local/bin/docker-compose $composefileoverride down -v
     sudo -u "{{ compose_service_user }}" /usr/local/bin/docker-compose $composefileoverride rm -fv
-    sudo -u "{{ compose_service_user }}" ORACLE_VALIDATOR_ADDRESS=$vaddr ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=$vkey /usr/local/bin/docker-compose $composefileoverride up --detach
+    sudo -u "{{ compose_service_user }}" \
+    ORACLE_VALIDATOR_ADDRESS=$vaddr ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=$vkey \
+    /usr/local/bin/docker-compose $composefileoverride up --detach
+
+    # this containers are not used in production because a validator should not execute a claim in the foreign network
+    sudo -u "{{ compose_service_user }}" \
+    ORACLE_VALIDATOR_ADDRESS=$vaddr ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=$vkey \
+    /usr/local/bin/docker-compose $composefileoverride \
+    stop bridge_senderforeign bridge_collected
 }
 
 stop(){
