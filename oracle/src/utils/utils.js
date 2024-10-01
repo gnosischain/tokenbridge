@@ -223,6 +223,21 @@ function zipToObject(keys, values) {
   return res
 }
 
+function returnUniqueTxs(txToSend) {
+  const seenData = new Set() // Keep track of seen 'data' values
+
+  const uniqueTxToSend = txToSend.filter(tx => {
+    if (seenData.has(tx.data)) {
+      return false // Filter out duplicates
+    } else {
+      seenData.add(tx.data)
+      return true // Keep unique entries
+    }
+  })
+
+  return uniqueTxToSend
+}
+
 module.exports = {
   syncForEach,
   checkHTTPS,
@@ -243,5 +258,6 @@ module.exports = {
   getRetrySequence,
   promiseAny,
   readAccessListFile,
-  zipToObject
+  zipToObject,
+  returnUniqueTxs
 }
