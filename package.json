@@ -36,7 +36,7 @@
     "alm-e2e"
   ],
   "scripts": {
-    "initialize": "yarn clean && git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn install:deploy && yarn compile:contracts",
+    "initialize": "yarn clean && yarn install --unsafe-perm --frozen-lockfile && yarn install:deploy && yarn compile:contracts",
     "build": "yarn build:alm && yarn build:plugin",
     "build:alm": "yarn workspace alm run build",
     "build:plugin": "yarn workspace burner-wallet-plugin run build",
