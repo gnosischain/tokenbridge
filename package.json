@@ -36,7 +36,7 @@
     "alm-e2e"
   ],
   "scripts": {
-    "initialize": "yarn clean && yarn install --unsafe-perm --frozen-lockfile && yarn install:deploy",
+    "initialize": "yarn clean && yarn install --unsafe-perm --frozen-lockfile",
     "build": "yarn build:alm && yarn build:plugin",
     "build:alm": "yarn workspace alm run build",
     "build:plugin": "yarn workspace burner-wallet-plugin run build",
@@ -45,9 +45,7 @@
     "oracle-e2e": "./oracle-e2e/run-tests.sh",
     "monitor-e2e": "./monitor-e2e/run-tests.sh",
     "alm-e2e": "./alm-e2e/run-tests.sh",
-    "clean": "rm -rf ./node_modules ./**/node_modules ./**/**/node_modules ./**/build ./**/**/dist",
-    "install:deploy": "cd contracts/deploy && npm install --unsafe-perm --silent",
-    "postinstall": "test -n \"$NOYARNPOSTINSTALL\" || ln -sf $(pwd)/node_modules/openzeppelin-solidity/ contracts/node_modules/openzeppelin-solidity"
+    "clean": "rm -rf ./node_modules ./**/node_modules ./**/**/node_modules ./**/build ./**/**/dist"
   },
   "resolutions": {
     "**/@mycrypto/eth-scan": "3.5.3"
