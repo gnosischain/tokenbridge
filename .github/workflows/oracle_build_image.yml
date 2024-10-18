@@ -54,6 +54,7 @@ jobs:
           context: .
           file: ./oracle/Dockerfile
           push: true
+          no-cache: true
           tags: gnosischain/tokenbridge-oracle:${{ steps.get_tag.outputs.version }},gnosischain/tokenbridge-oracle:latest
 
   notify:
