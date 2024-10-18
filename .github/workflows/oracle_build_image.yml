@@ -21,12 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          repository: gnosischain/tokenbridge-contracts
-          path: ./contracts
-          ref: 908a48107919d4ab127f9af07d44d47eac91547e
+      # Pointing to old repo of contracts: TODO add ABIS from tokenbridge-contracts
+      # - name: Checkout
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: gnosischain/tokenbridge-contracts
+      #     path: ./contracts
+      #     ref: 908a48107919d4ab127f9af07d44d47eac91547e
 
       # Step 2: Extract version tag
       - name: Get current version tag
