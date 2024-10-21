@@ -44,7 +44,6 @@ The deployed components have the following services:
 Component | Service Name
 --- | ---
 Oracle | poabridge
-Monitor | tokenbridge-monitor
 
 Use the default `SysVinit` commands to `start`, `stop`, `restart`, and `rebuild` the service and to check the `status` of the service. 
 
@@ -72,8 +71,10 @@ where the _<watcher>_ could be one of the following:
 - `signature-request`
 - `collected-signatures`
 - `affirmation-request`
+- `transfer`
 
 ## Reset nonce counters
+
 In case some tx from your bridge validator account were done outside the bridge, you might need to update nonce counters.
 
 1. ssh to your bridge node and run:
