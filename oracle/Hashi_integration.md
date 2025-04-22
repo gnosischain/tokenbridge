@@ -2,23 +2,19 @@
 
 [Hashi](https://github.com/gnosis/hashi) integration in Gnosis tokenbridge introduces a few changes(more in below) in the contracts level. To make the Oracle code compatible to the integration, here are the steps to compile and run the code.
 
-1. Clone the repo: `git clone https://github.com/gnosischain/tokenbridge.git`
-2. Update gitmdoule: `git submodule init && git submodule update`
-3. Switch to the `feat/hashi-integration-xdai-bridge` branch: `cd contracts && git switch feat/hashi-integration-xdai-bridge & cd ..`
-4. Install and compile contracts: `nvm use && yarn initialize`
-5. Update .env file: `.env.xdai` & `.env.amb` respectively.
-6. Build and run
+1. Update .env file: `.env.xdai` & `.env.amb` respectively (refer to `.env.example.xdai` & `.env.example.amb`).
+2. Build and run
    1. AMB:
    ```
     env ORACLE_VALIDATOR_ADDRESS=<validator address> \
     env ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=<validator address private key> \
-    docker-compose -f docker-compose-build.yml -f docker-compose-amb.yml up -d --build
+    docker-compose -f docker-compose-amb.yml up -d --build
    ```
    2. xDAI:
    ```
     env ORACLE_VALIDATOR_ADDRESS=<validator address> \
     env ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=<validator address private key> \
-    docker-compose -f docker-compose-build.yml -f docker-compose-xdai.yml up -d --build
+    docker-compose -f docker-compose-xdai.yml up -d --build
    ```
 
 ## Contracts changes from Hashi integration

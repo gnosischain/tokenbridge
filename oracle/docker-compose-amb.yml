@@ -33,7 +33,7 @@ services:
   bridge_request_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge
+    image: gnosischain/tokenbridge-oracle:v3.8.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -46,7 +46,7 @@ services:
   bridge_affirmation_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge
+    image: gnosischain/tokenbridge-oracle:v3.8.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -59,7 +59,7 @@ services:
   bridge_senderhome_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge
+    image: gnosischain/tokenbridge-oracle:v3.8.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -72,7 +72,7 @@ services:
   bridge_senderforeign_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge
+    image: gnosischain/tokenbridge-oracle:v3.8.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -85,7 +85,7 @@ services:
   bridge_shutdown_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge
+    image: gnosischain/tokenbridge-oracle:v3.8.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
