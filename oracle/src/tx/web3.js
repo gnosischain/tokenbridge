@@ -53,11 +53,12 @@ async function getChainId(web3) {
 
 async function getRequiredBlockConfirmations(contract) {
   try {
-    const contractAddress = contract.options.address
-    logger.debug({ contractAddress }, 'Getting required block confirmations')
-    const requiredBlockConfirmations = parseInt(await contract.methods.requiredBlockConfirmations().call(), 10)
-    logger.debug({ contractAddress, requiredBlockConfirmations }, 'Required block confirmations obtained')
-    return requiredBlockConfirmations
+    // const contractAddress = contract.options.address
+    // logger.debug({ contractAddress }, 'Getting required block confirmations')
+    // const requiredBlockConfirmations = parseInt(await contract.methods.requiredBlockConfirmations().call(), 10)
+    // logger.debug({ contractAddress, requiredBlockConfirmations }, 'Required block confirmations obtained')
+    // return requiredBlockConfirmations
+    return 0
   } catch (e) {
     logger.error(e.message)
     throw new Error(`Required block confirmations cannot be obtained`)

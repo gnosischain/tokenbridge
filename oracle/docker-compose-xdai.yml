@@ -5,7 +5,7 @@ services:
     mem_limit: 500m
     environment: [ 'RABBITMQ_NODENAME=node@rabbit' ]
     hostname: rabbit
-    image: rabbitmq:3
+    image: rabbitmq:3.12-alpine
     networks:
       - net_rabbit_bridge_request_xdai
       - net_rabbit_bridge_affirmation_xdai
@@ -18,7 +18,7 @@ services:
     mem_limit: 500m
     command: [ redis-server, --appendonly, 'yes' ]
     hostname: redis
-    image: redis:4
+    image: redis:4.0.14-alpine
     networks:
       - net_db_bridge_request_xdai
       - net_db_bridge_affirmation_xdai
@@ -32,7 +32,7 @@ services:
   bridge_request_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.9.0
+    image: gnosischain/tokenbridge-oracle
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -45,7 +45,7 @@ services:
   bridge_affirmation_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.9.0
+    image: gnosischain/tokenbridge-oracle
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -58,7 +58,7 @@ services:
   bridge_senderhome_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.9.0
+    image: gnosischain/tokenbridge-oracle
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -71,7 +71,7 @@ services:
   bridge_senderforeign_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.9.0
+    image: gnosischain/tokenbridge-oracle
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -84,7 +84,7 @@ services:
   bridge_shutdown_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.9.0
+    image: gnosischain/tokenbridge-oracle
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
