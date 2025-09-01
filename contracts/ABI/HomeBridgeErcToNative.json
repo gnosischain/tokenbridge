@@ -1104,6 +1104,11 @@
             "indexed": false,
             "name": "nonce",
             "type": "bytes32"
+          },
+          {
+            "indexed": false,
+            "name": "token",
+            "type": "address"
           }
         ],
         "name": "UserRequestForSignature",
