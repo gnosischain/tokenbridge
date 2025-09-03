@@ -21,7 +21,7 @@ function createxDAIMessage({ recipient, value, nonce, bridgeAddress, tokenAddres
   assert.strictEqual(bridgeAddress.length, 20 * 2)
 
   tokenAddress = strip0x(tokenAddress)
-  assert.strictEqual(tokenAddress, 20*2)
+  assert.strictEqual(tokenAddress.length, 20*2)
 
   const message = `0x${recipient}${value}${nonce}${bridgeAddress}${tokenAddress}`
   assert.strictEqual(message.length, 2 + 2 * expectedMessageLength)

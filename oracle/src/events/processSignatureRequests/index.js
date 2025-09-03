@@ -41,7 +41,7 @@ function processSignatureRequestsBuilder(config) {
         })
 
         logger.info(
-          { sender: recipient, value, nonce },
+          { sender: recipient, value, nonce, token },
           `Processing signatureRequest ${signatureRequest.transactionHash}`
         )
 
