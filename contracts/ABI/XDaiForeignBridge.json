@@ -1,1270 +1,1298 @@
 {
-    "abi": [
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_receiver",
-            "type": "address"
-          },
-          {
-            "name": "_amount",
-            "type": "uint256"
-          }
-        ],
-        "name": "relayTokens",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "invest",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [],
-        "name": "refillBridge",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_amount",
-            "type": "uint256"
-          }
-        ],
-        "name": "payInterest",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "erc20token",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "HASHI_IS_MANDATORY",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "message",
-            "type": "bytes"
-          },
-          {
-            "name": "signatures",
-            "type": "bytes"
-          },
-          {
-            "name": "maxTokensFee",
-            "type": "uint256"
-          }
-        ],
-        "name": "executeSignaturesGSN",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_nonce",
-            "type": "bytes32"
-          }
-        ],
-        "name": "relayedMessages",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_day",
-            "type": "uint256"
-          }
-        ],
-        "name": "totalSpentPerDay",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "sDaiToken",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "pure",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "isInitialized",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_dailyLimit",
-            "type": "uint256"
-          }
-        ],
-        "name": "setExecutionDailyLimit",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "getCurrentDay",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "requiredBlockConfirmations",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "message",
-            "type": "bytes"
-          },
-          {
-            "name": "signatures",
-            "type": "bytes"
-          }
-        ],
-        "name": "executeSignatures",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "getBridgeMode",
-        "outputs": [
-          {
-            "name": "_data",
-            "type": "bytes4"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "pure",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "executionDailyLimit",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "minInterestPaid",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "versionRecipient",
-        "outputs": [
-          {
-            "name": "",
-            "type": "string"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_day",
-            "type": "uint256"
-          }
-        ],
-        "name": "totalExecutedPerDay",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "minCashThreshold",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "forwarder",
-            "type": "address"
-          }
-        ],
-        "name": "isTrustedForwarder",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "dailyLimit",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_to",
-            "type": "address"
-          }
-        ],
-        "name": "claimTokens",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_validatorContract",
-            "type": "address"
-          },
-          {
-            "name": "_erc20token",
-            "type": "address"
-          },
-          {
-            "name": "_requiredBlockConfirmations",
-            "type": "uint256"
-          },
-          {
-            "name": "_gasPrice",
-            "type": "uint256"
-          },
-          {
-            "name": "_dailyLimitMaxPerTxMinPerTxArray",
-            "type": "uint256[3]"
-          },
-          {
-            "name": "_homeDailyLimitHomeMaxPerTxArray",
-            "type": "uint256[2]"
-          },
-          {
-            "name": "_owner",
-            "type": "address"
-          },
-          {
-            "name": "_decimalShift",
-            "type": "int256"
-          },
-          {
-            "name": "_bridgeOnOtherSide",
-            "type": "address"
-          }
-        ],
-        "name": "initialize",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [],
-        "name": "investDai",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "data",
-            "type": "bytes"
-          }
-        ],
-        "name": "resendDataWithHashi",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "hashiManager",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_paymaster",
-            "type": "address"
-          }
-        ],
-        "name": "setPayMaster",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_amount",
-            "type": "uint256"
-          }
-        ],
-        "name": "withinExecutionLimit",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "executionMaxPerTx",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "HASHI_IS_ENABLED",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "requiredSignatures",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "owner",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "hashMsg",
-            "type": "bytes32"
-          }
-        ],
-        "name": "isApprovedByHashi",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_receiver",
-            "type": "address"
-          }
-        ],
-        "name": "setInterestReceiver",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "maxAvailablePerTx",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "validatorContract",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "deployedAtBlock",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "getBridgeInterfacesVersion",
-        "outputs": [
-          {
-            "name": "major",
-            "type": "uint64"
-          },
-          {
-            "name": "minor",
-            "type": "uint64"
-          },
-          {
-            "name": "patch",
-            "type": "uint64"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "pure",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_minPerTx",
-            "type": "uint256"
-          }
-        ],
-        "name": "setMinPerTx",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_minInterestPaid",
-            "type": "uint256"
-          }
-        ],
-        "name": "setMinInterestPaid",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_minCashThreshold",
-            "type": "uint256"
-          }
-        ],
-        "name": "setMinCashThreshold",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "interestReceiver",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_blockConfirmations",
-            "type": "uint256"
-          }
-        ],
-        "name": "setRequiredBlockConfirmations",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "nonce",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_dailyLimit",
-            "type": "uint256"
-          }
-        ],
-        "name": "setDailyLimit",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_amount",
-            "type": "uint256"
-          }
-        ],
-        "name": "previewWithdraw",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "daiToken",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "pure",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_hashiManager",
-            "type": "address"
-          }
-        ],
-        "name": "setHashiManager",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_gasPrice",
-            "type": "uint256"
-          }
-        ],
-        "name": "setGasPrice",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_to",
-            "type": "address"
-          }
-        ],
-        "name": "recoverLegacyTransfer",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_maxPerTx",
-            "type": "uint256"
-          }
-        ],
-        "name": "setMaxPerTx",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "interestAmount",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          },
-          {
-            "name": "_minCashThreshold",
-            "type": "uint256"
-          },
-          {
-            "name": "_minInterestPaid",
-            "type": "uint256"
-          },
-          {
-            "name": "_interestReceiver",
-            "type": "address"
-          }
-        ],
-        "name": "initializeInterest",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "getTrustedForwarder",
-        "outputs": [
-          {
-            "name": "",
-            "type": "address"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "investedAmount",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "isInterestEnabled",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          },
-          {
-            "name": "chainId",
-            "type": "uint256"
-          },
-          {
-            "name": "sender",
-            "type": "address"
-          },
-          {
-            "name": "threshold",
-            "type": "uint256"
-          },
-          {
-            "name": "adapters",
-            "type": "address[]"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          }
-        ],
-        "name": "onMessage",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bytes"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_trustedForwarder",
-            "type": "address"
-          }
-        ],
-        "name": "setTrustedForwarder",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "decimalShift",
-        "outputs": [
-          {
-            "name": "",
-            "type": "int256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "minPerTx",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [
-          {
-            "name": "_amount",
-            "type": "uint256"
-          }
-        ],
-        "name": "withinLimit",
-        "outputs": [
-          {
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_maxPerTx",
-            "type": "uint256"
-          }
-        ],
-        "name": "setExecutionMaxPerTx",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "newOwner",
-            "type": "address"
-          }
-        ],
-        "name": "transferOwnership",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
-          {
-            "name": "_token",
-            "type": "address"
-          }
-        ],
-        "name": "disableInterest",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "maxPerTx",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "constant": true,
-        "inputs": [],
-        "name": "gasPrice",
-        "outputs": [
-          {
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "payable": false,
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": true,
-            "name": "token",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "name": "to",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "name": "PaidInterest",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "recipient",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "name": "value",
-            "type": "uint256"
-          },
-          {
-            "indexed": false,
-            "name": "transactionHash",
-            "type": "bytes32"
-          }
-        ],
-        "name": "RelayedMessage",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "recipient",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "name": "value",
-            "type": "uint256"
-          },
-          {
-            "indexed": false,
-            "name": "nonce",
-            "type": "bytes32"
-          }
-        ],
-        "name": "UserRequestForAffirmation",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "newLimit",
-            "type": "uint256"
-          }
-        ],
-        "name": "DailyLimitChanged",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "newLimit",
-            "type": "uint256"
-          }
-        ],
-        "name": "ExecutionDailyLimitChanged",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "gasPrice",
-            "type": "uint256"
-          }
-        ],
-        "name": "GasPriceChanged",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "requiredBlockConfirmations",
-            "type": "uint256"
-          }
-        ],
-        "name": "RequiredBlockConfirmationChanged",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": false,
-            "name": "previousOwner",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "name": "newOwner",
-            "type": "address"
-          }
-        ],
-        "name": "OwnershipTransferred",
-        "type": "event"
-      }
-    ]
-  }
-  
+  "abi":[
+     {
+        "type":"function",
+        "name":"DAI",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"DAI_USDS",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"HASHI_IS_ENABLED",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"HASHI_IS_MANDATORY",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"USDS",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"claimTokens",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_to",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"daiToken",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"pure"
+     },
+     {
+        "type":"function",
+        "name":"dailyLimit",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"decimalShift",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"int256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"deployedAtBlock",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"disableInterest",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"erc20token",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"executeSignatures",
+        "inputs":[
+           {
+              "name":"message",
+              "type":"bytes"
+           },
+           {
+              "name":"signatures",
+              "type":"bytes"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"executeSignaturesGSN",
+        "inputs":[
+           {
+              "name":"message",
+              "type":"bytes"
+           },
+           {
+              "name":"signatures",
+              "type":"bytes"
+           },
+           {
+              "name":"maxTokensFee",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"executionDailyLimit",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"executionMaxPerTx",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"gasPrice",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"getBridgeInterfacesVersion",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"major",
+              "type":"uint64"
+           },
+           {
+              "name":"minor",
+              "type":"uint64"
+           },
+           {
+              "name":"patch",
+              "type":"uint64"
+           }
+        ],
+        "stateMutability":"pure"
+     },
+     {
+        "type":"function",
+        "name":"getBridgeMode",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"_data",
+              "type":"bytes4"
+           }
+        ],
+        "stateMutability":"pure"
+     },
+     {
+        "type":"function",
+        "name":"getCurrentDay",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"getTrustedForwarder",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"hashiManager",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"initialize",
+        "inputs":[
+           {
+              "name":"_validatorContract",
+              "type":"address"
+           },
+           {
+              "name":"_erc20token",
+              "type":"address"
+           },
+           {
+              "name":"_requiredBlockConfirmations",
+              "type":"uint256"
+           },
+           {
+              "name":"_gasPrice",
+              "type":"uint256"
+           },
+           {
+              "name":"_dailyLimitMaxPerTxMinPerTxArray",
+              "type":"uint256[3]"
+           },
+           {
+              "name":"_homeDailyLimitHomeMaxPerTxArray",
+              "type":"uint256[2]"
+           },
+           {
+              "name":"_owner",
+              "type":"address"
+           },
+           {
+              "name":"_decimalShift",
+              "type":"int256"
+           },
+           {
+              "name":"_bridgeOnOtherSide",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"initializeInterest",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_minCashThreshold",
+              "type":"uint256"
+           },
+           {
+              "name":"_minInterestPaid",
+              "type":"uint256"
+           },
+           {
+              "name":"_interestReceiver",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"interestAmount",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"interestReceiver",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"invest",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"investDai",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"investedAmount",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"isApprovedByHashi",
+        "inputs":[
+           {
+              "name":"hashMsg",
+              "type":"bytes32"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"isInitialized",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"isInterestEnabled",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"isTrustedForwarder",
+        "inputs":[
+           {
+              "name":"forwarder",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"maxAvailablePerTx",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"maxPerTx",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"minCashThreshold",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"minInterestPaid",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"minPerTx",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"nonce",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"onMessage",
+        "inputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           },
+           {
+              "name":"chainId",
+              "type":"uint256"
+           },
+           {
+              "name":"sender",
+              "type":"address"
+           },
+           {
+              "name":"threshold",
+              "type":"uint256"
+           },
+           {
+              "name":"adapters",
+              "type":"address[]"
+           },
+           {
+              "name":"data",
+              "type":"bytes"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bytes"
+           }
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"owner",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"payInterest",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_amount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"previewWithdraw",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_amount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"recoverLegacyTransfer",
+        "inputs":[
+           {
+              "name":"_to",
+              "type":"address"
+           },
+           {
+              "name":"recoverAmount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"refillBridge",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"relayTokens",
+        "inputs":[
+           {
+              "name":"_receiver",
+              "type":"address"
+           },
+           {
+              "name":"_amount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"relayedMessages",
+        "inputs":[
+           {
+              "name":"_nonce",
+              "type":"bytes32"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"requiredBlockConfirmations",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"requiredSignatures",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"resendDataWithHashi",
+        "inputs":[
+           {
+              "name":"data",
+              "type":"bytes"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"sDaiToken",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"pure"
+     },
+     {
+        "type":"function",
+        "name":"setDailyLimit",
+        "inputs":[
+           {
+              "name":"_dailyLimit",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setExecutionDailyLimit",
+        "inputs":[
+           {
+              "name":"_dailyLimit",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setExecutionMaxPerTx",
+        "inputs":[
+           {
+              "name":"_maxPerTx",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setGasPrice",
+        "inputs":[
+           {
+              "name":"_gasPrice",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setHashiManager",
+        "inputs":[
+           {
+              "name":"_hashiManager",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setInterestReceiver",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_receiver",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setMaxPerTx",
+        "inputs":[
+           {
+              "name":"_maxPerTx",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setMinCashThreshold",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_minCashThreshold",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setMinInterestPaid",
+        "inputs":[
+           {
+              "name":"_token",
+              "type":"address"
+           },
+           {
+              "name":"_minInterestPaid",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setMinPerTx",
+        "inputs":[
+           {
+              "name":"_minPerTx",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setPayMaster",
+        "inputs":[
+           {
+              "name":"_paymaster",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setRequiredBlockConfirmations",
+        "inputs":[
+           {
+              "name":"_blockConfirmations",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"setTrustedForwarder",
+        "inputs":[
+           {
+              "name":"_trustedForwarder",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"swapSDAIToUSDS",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"totalExecutedPerDay",
+        "inputs":[
+           {
+              "name":"_day",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"totalSpentPerDay",
+        "inputs":[
+           {
+              "name":"_day",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"uint256"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"transferOwnership",
+        "inputs":[
+           {
+              "name":"newOwner",
+              "type":"address"
+           }
+        ],
+        "outputs":[
+           
+        ],
+        "stateMutability":"nonpayable"
+     },
+     {
+        "type":"function",
+        "name":"validatorContract",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"address"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"versionRecipient",
+        "inputs":[
+           
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"string"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"withinExecutionLimit",
+        "inputs":[
+           {
+              "name":"_amount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"function",
+        "name":"withinLimit",
+        "inputs":[
+           {
+              "name":"_amount",
+              "type":"uint256"
+           }
+        ],
+        "outputs":[
+           {
+              "name":"",
+              "type":"bool"
+           }
+        ],
+        "stateMutability":"view"
+     },
+     {
+        "type":"event",
+        "name":"DailyLimitChanged",
+        "inputs":[
+           {
+              "name":"newLimit",
+              "type":"uint256",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"ExecutionDailyLimitChanged",
+        "inputs":[
+           {
+              "name":"newLimit",
+              "type":"uint256",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"GasPriceChanged",
+        "inputs":[
+           {
+              "name":"gasPrice",
+              "type":"uint256",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"OwnershipTransferred",
+        "inputs":[
+           {
+              "name":"previousOwner",
+              "type":"address",
+              "indexed":false
+           },
+           {
+              "name":"newOwner",
+              "type":"address",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"PaidInterest",
+        "inputs":[
+           {
+              "name":"token",
+              "type":"address",
+              "indexed":true
+           },
+           {
+              "name":"to",
+              "type":"address",
+              "indexed":false
+           },
+           {
+              "name":"value",
+              "type":"uint256",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"RelayedMessage",
+        "inputs":[
+           {
+              "name":"recipient",
+              "type":"address",
+              "indexed":false
+           },
+           {
+              "name":"value",
+              "type":"uint256",
+              "indexed":false
+           },
+           {
+              "name":"transactionHash",
+              "type":"bytes32",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"RequiredBlockConfirmationChanged",
+        "inputs":[
+           {
+              "name":"requiredBlockConfirmations",
+              "type":"uint256",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     },
+     {
+        "type":"event",
+        "name":"UserRequestForAffirmation",
+        "inputs":[
+           {
+              "name":"recipient",
+              "type":"address",
+              "indexed":false
+           },
+           {
+              "name":"value",
+              "type":"uint256",
+              "indexed":false
+           },
+           {
+              "name":"nonce",
+              "type":"bytes32",
+              "indexed":false
+           }
+        ],
+        "anonymous":false
+     }
+  ]
+}
