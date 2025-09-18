@@ -1,6 +1,7 @@
 const assert = require('assert')
 const { toHex, numberToHex, padLeft } = require('web3').utils
 const { strip0x } = require('../../../commons')
+const { DEFAULT_DAI_ADDRESS, ZERO_ADDRESS } = require('./constants')
 
 ///@dev After Hashi integration, transactionHash is replaced with nonce
 ///@dev After USDS migration, tokenAddress is added to the message
@@ -21,13 +22,12 @@ function createxDAIMessage({ recipient, value, nonce, bridgeAddress, tokenAddres
   assert.strictEqual(bridgeAddress.length, 20 * 2)
 
   tokenAddress = strip0x(tokenAddress)
-  assert.strictEqual(tokenAddress.length, 20*2)
+  assert.strictEqual(tokenAddress.length, 20 * 2)
 
   const message = `0x${recipient}${value}${nonce}${bridgeAddress}${tokenAddress}`
   assert.strictEqual(message.length, 2 + 2 * expectedMessageLength)
   return message
 }
-
 
 ///@dev This function is not used anymore, but kept for reference
 function createMessage({ recipient, value, transactionHash, bridgeAddress, expectedMessageLength }) {
@@ -62,7 +62,7 @@ function parseMessage(message) {
   const amountLength = 32 * 2
   const amount = `0x${message.slice(amountStart, amountStart + amountLength)}`
 
-    // txHash becomes nonce after Hashi upgrade
+  // txHash becomes nonce after Hashi upgrade
   const txHashStart = amountStart + amountLength
   const txHashLength = 32 * 2
   const txHash = `0x${message.slice(txHashStart, txHashStart + txHashLength)}`
@@ -76,12 +76,11 @@ function parseMessage(message) {
   const tokenAddressLength = 40
   let tokenAddress
   // For old message that doesn't have token address in the event, we use DAI as default
-  if(`0x${message.slice(tokenAddressStart, tokenAddressStart + tokenAddressLength)}` == '0x0000000000000000000000000000000000000000'){
-    tokenAddress = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-  }else{
+  if (`0x${message.slice(tokenAddressStart, tokenAddressStart + tokenAddressLength)}` === ZERO_ADDRESS) {
+    tokenAddress = DEFAULT_DAI_ADDRESS
+  } else {
     tokenAddress = `0x${message.slice(tokenAddressStart, tokenAddressStart + tokenAddressLength)}`
   }
-
 
   return {
     recipient,

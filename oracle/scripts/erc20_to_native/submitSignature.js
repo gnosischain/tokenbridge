@@ -5,6 +5,7 @@ const { web3Home } = require('../../src/services/web3')
 const { sendTx } = require('../../src/tx/sendTx')
 const { HOME_ERC_TO_NATIVE_ABI } = require('../../../commons')
 const { createxDAIMessage } = require('../../src/utils/message')
+const { DEFAULT_DAI_ADDRESS } = require('../../src/utils/constants')
 
 const {
   COMMON_HOME_BRIDGE_ADDRESS,
@@ -40,8 +41,8 @@ async function main() {
     const userRequestTopic1 = '0xbcb4ebd89690a7455d6ec096a6bfc4a8a891ac741ffe4e678ea2614853248658' // keccak256(UserRequestForSignature(address,uint256,bytes32))
     const userRequestTopic2 = '0xe1e0bc4a1db39a361e3589cae613d7b4862e1f9114dd3ff12ff45be395046968' // keccak256(UserRequestForSignature(address,uint256,bytes32,address))
 
-    const relevantLogs = receipt.logs.filter(log => 
-      log.topics[0] === userRequestTopic1 || log.topics[0] === userRequestTopic2
+    const relevantLogs = receipt.logs.filter(
+      log => log.topics[0] === userRequestTopic1 || log.topics[0] === userRequestTopic2
     )
 
     if (relevantLogs.length === 0) {
@@ -56,13 +57,13 @@ async function main() {
 
       if (log.topics[0] === userRequestTopic1) {
         // UserRequestForSignature(address recipient, uint256 value, bytes32 nonce)
-        recipient = '0x' + log.data.slice(26,66) // first 20 bytes
+        recipient = '0x' + log.data.slice(26, 66) // first 20 bytes
         value = web3Home.utils.hexToNumberString('0x' + log.data.slice(66, 130)) // second 32 bytes
         nonce = '0x' + log.data.slice(130, 194) // third 32 bytes
-        token = '0x6B175474E89094C44Da98b954EedeAC495271d0F' // Default DAI address
+        token = DEFAULT_DAI_ADDRESS
       } else {
         // UserRequestForSignature(address recipient, uint256 value, bytes32 nonce, address token)
-        recipient = '0x' + log.data.slice(26,66) // first 20 bytes
+        recipient = '0x' + log.data.slice(26, 66) // first 20 bytes
         value = web3Home.utils.hexToNumberString('0x' + log.data.slice(66, 130)) // second 32 bytes
         nonce = '0x' + log.data.slice(130, 194) // third 32 bytes
         token = '0x' + log.data.slice(-40) // last 20 bytes
@@ -77,7 +78,7 @@ async function main() {
         nonce,
         bridgeAddress: COMMON_FOREIGN_BRIDGE_ADDRESS,
         tokenAddress: token,
-        expectedMessageLength: 124 
+        expectedMessageLength: 124
       })
 
       console.log(`Created message: ${message}`)
@@ -114,7 +115,6 @@ async function main() {
 
       console.log(`Submitted signature transaction: ${txHash}`)
     }
-
   } catch (e) {
     console.error('Error:', e.message)
     process.exit(1)
