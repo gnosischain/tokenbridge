@@ -1,7 +1,7 @@
 const assert = require('assert')
 const { toHex, numberToHex, padLeft } = require('web3').utils
 const { strip0x } = require('../../../commons')
-const { DEFAULT_DAI_ADDRESS, ZERO_ADDRESS } = require('./constants')
+const { DAI_ADDRESS } = require('./constants')
 
 ///@dev After Hashi integration, transactionHash is replaced with nonce
 ///@dev After USDS migration, tokenAddress is added to the message
@@ -52,6 +52,13 @@ function createMessage({ recipient, value, transactionHash, bridgeAddress, expec
 }
 
 function parseMessage(message) {
+  if (message.length !== 124 * 2 + 2 && message.length !== 104 * 2 + 2) throw new Error('Invalid message length')
+
+  let isNewFormat = false
+  if (message.length == 124 * 2 + 2) {
+    isNewFormat = true
+  }
+
   message = strip0x(message)
 
   const recipientStart = 0
@@ -72,12 +79,13 @@ function parseMessage(message) {
   const contractAddress = `0x${message.slice(contractAddressStart, contractAddressStart + contractAddressLength)}`
 
   // Check if message.length is longer
+
   const tokenAddressStart = contractAddressStart + contractAddressLength
   const tokenAddressLength = 40
   let tokenAddress
   // For old message that doesn't have token address in the event, we use DAI as default
-  if (`0x${message.slice(tokenAddressStart, tokenAddressStart + tokenAddressLength)}` === ZERO_ADDRESS) {
-    tokenAddress = DEFAULT_DAI_ADDRESS
+  if (!isNewFormat) {
+    tokenAddress = DAI_ADDRESS
   } else {
     tokenAddress = `0x${message.slice(tokenAddressStart, tokenAddressStart + tokenAddressLength)}`
   }

@@ -5,7 +5,7 @@ const { web3Home } = require('../../src/services/web3')
 const { sendTx } = require('../../src/tx/sendTx')
 const { HOME_ERC_TO_NATIVE_ABI } = require('../../../commons')
 const { createxDAIMessage } = require('../../src/utils/message')
-const { DEFAULT_DAI_ADDRESS } = require('../../src/utils/constants')
+const { DAI_ADDRESS } = require('../../src/utils/constants')
 
 const {
   COMMON_HOME_BRIDGE_ADDRESS,
@@ -60,7 +60,7 @@ async function main() {
         recipient = '0x' + log.data.slice(26, 66) // first 20 bytes
         value = web3Home.utils.hexToNumberString('0x' + log.data.slice(66, 130)) // second 32 bytes
         nonce = '0x' + log.data.slice(130, 194) // third 32 bytes
-        token = DEFAULT_DAI_ADDRESS
+        token = DAI_ADDRESS
       } else {
         // UserRequestForSignature(address recipient, uint256 value, bytes32 nonce, address token)
         recipient = '0x' + log.data.slice(26, 66) // first 20 bytes
