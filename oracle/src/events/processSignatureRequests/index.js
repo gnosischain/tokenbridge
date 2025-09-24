@@ -6,7 +6,7 @@ const { getValidatorContract } = require('../../tx/web3')
 const { createxDAIMessage } = require('../../utils/message')
 const estimateGas = require('./estimateGas')
 const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
-const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
+const { EXIT_CODES, MAX_CONCURRENT_EVENTS, DAI_ADDRESS, USDS_ADDRESS } = require('../../utils/constants')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -20,9 +20,11 @@ function processSignatureRequestsBuilder(config) {
     const txToSend = []
 
     if (expectedMessageLength === null) {
-      // note: requiredMessageLength() is removed as a public function after Gnosis-Hashi integration
+      ///@dev requiredMessageLength() is removed as a public function after Gnosis-Hashi integration
       // expectedMessageLength = await bridgeContract.methods.requiredMessageLength().call()
-      expectedMessageLength = 104
+
+      ///@dev After USDS migration, tokenAddress is added to the message, so the message length is 124
+      expectedMessageLength = 124
     }
 
     if (validatorContract === null) {
@@ -32,14 +34,18 @@ function processSignatureRequestsBuilder(config) {
     rootLogger.debug(`Processing ${signatureRequests.length} SignatureRequest events`)
     const callbacks = signatureRequests
       .map(signatureRequest => async () => {
-        const { recipient, value, nonce } = signatureRequest.returnValues
+        const { recipient, value, nonce, token } = signatureRequest.returnValues
+
+        if (token !== DAI_ADDRESS || token !== USDS_ADDRESS) {
+          return
+        }
 
         const logger = rootLogger.child({
           eventTransactionHash: signatureRequest.transactionHash
         })
 
         logger.info(
-          { sender: recipient, value, nonce },
+          { sender: recipient, value, nonce, token },
           `Processing signatureRequest ${signatureRequest.transactionHash}`
         )
 
@@ -48,6 +54,7 @@ function processSignatureRequestsBuilder(config) {
           value,
           nonce,
           bridgeAddress: config.foreign.bridgeAddress,
+          tokenAddress: token,
           expectedMessageLength
         })
 
