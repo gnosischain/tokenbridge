@@ -36,7 +36,7 @@ function processSignatureRequestsBuilder(config) {
       .map(signatureRequest => async () => {
         const { recipient, value, nonce, token } = signatureRequest.returnValues
 
-        if (token !== DAI_ADDRESS || token !== USDS_ADDRESS) {
+        if (token !== DAI_ADDRESS && token !== USDS_ADDRESS) {
           return
         }
 
