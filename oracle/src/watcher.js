@@ -4,9 +4,10 @@ const { connectWatcherToQueue, connection } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
-const { getBlockNumber, getRequiredBlockConfirmations, getEvents } = require('./tx/web3')
+const { getEvents } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
 const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS } = require('./utils/constants')
+const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
 
 if (process.argv.length < 3) {
   logger.error('Please check the number of arguments, config file was not provided')
@@ -35,12 +36,13 @@ const {
   chain,
   reprocessingOptions,
   blockPollingLimit,
-  syncCheckInterval
+  syncCheckInterval,
+  beaconChainUrl
 } = config.main
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
-let lastProcessedBlock = Math.max(startBlock - 1, 0)
+let lastProcessedBlock = Math.max(startBlock - 1, 0) // TODO: remove startBlock from env, always start with lastFinalizedBlock
 let lastReprocessedBlock
 
 async function initialize() {
@@ -49,6 +51,8 @@ async function initialize() {
 
     web3.currentProvider.urls.forEach(checkHttps(chain))
     web3.currentProvider.startSyncStateChecker(syncCheckInterval)
+
+    beaconChainUrl = checkHttps(beaconChainUrl, logger)
 
     await getLastProcessedBlock()
     await getLastReprocessedBlock()
@@ -216,12 +220,13 @@ function addSeenEvents(events) {
   return redis.zadd(seenEventsRedisKey, ...events.flatMap(e => [e.blockNumber, eventKey(e)]))
 }
 
-async function getLastBlockToProcess(web3, bridgeContract) {
-  const [lastBlockNumber, requiredBlockConfirmations] = await Promise.all([
-    getBlockNumber(web3),
-    getRequiredBlockConfirmations(bridgeContract)
-  ])
-  return lastBlockNumber - requiredBlockConfirmations
+// Dev: Switch from checking on-chain required block confirmation to beacon chain finalized block
+async function getLastBlockToProcess(beaconChainUrls) {
+  logger.info('Checking last finalized block')
+  // Fetch last finalized block:
+  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls)
+
+  return lastFinalizedBlock
 }
 
 async function main({ sendToQueue }) {
@@ -236,8 +241,11 @@ async function main({ sendToQueue }) {
       logger.info(`Oracle watcher was unsuspended.`)
     }
 
-    const lastBlockToProcess = await getLastBlockToProcess(web3, bridgeContract)
-
+    const lastBlockToProcess = await getLastBlockToProcess(beaconChainUrl)
+    if (lastBlockToProcess == null) {
+      logger.debug('Error return lastBlockToProcess')
+      return
+    }
     if (reprocessingOptions.enabled) {
       if (lastReprocessedBlock + reprocessingOptions.batchSize + reprocessingOptions.blockDelay < lastBlockToProcess) {
         await reprocessOldLogs(sendToQueue)
@@ -253,6 +261,11 @@ async function main({ sendToQueue }) {
     const fromBlock = lastProcessedBlock + 1
     const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
     let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
+
+    if (toBlock < fromBlock) {
+      logger.info(`From block < to block: skip processing and wait until the next cycle`)
+      return
+    }
 
     let events = await getEvents({
       contract: eventContract,
@@ -281,16 +294,15 @@ async function main({ sendToQueue }) {
         }
 
         job = await processAMBInformationRequests(events)
-        if(job === null){
-          logger.debug("No job to send")
+        if (job === null) {
+          logger.debug('No job to send')
           return
         }
-    
       } else {
         job = await processEvents(events)
       }
 
-      if (job!=null && job.length > 0){
+      if (job != null && job.length > 0) {
         logger.info('Transactions to send:', job.length)
         await sendToQueue(job)
       }
