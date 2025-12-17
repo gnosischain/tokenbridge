@@ -24,7 +24,7 @@ async function checkLastFinalizedBlock(urls) {
       logger.info(`Trying beacon chain URL ${i + 1}/${urlArray.length}: ${url}`)
       const result = await sendGet(url, options)
 
-      const blockNumber = result?.data?.message?.body?.execution_payload?.block_number
+      const blockNumber = result && result.data && result.data.message && result.data.message.body && result.data.message.body.execution_payload && result.data.message.body.execution_payload.block_number
       if (blockNumber) {
         logger.info(`Last finalized block: ${blockNumber} (from URL ${i + 1})`)
         return blockNumber

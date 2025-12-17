@@ -258,7 +258,7 @@ async function main({ sendToQueue }) {
       return
     }
 
-    const fromBlock = lastProcessedBlock + 1
+    const fromBlock = lastProcessedBlock === 0 ? lastBlockToProcess : lastProcessedBlock + 1
     const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
     let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
 
