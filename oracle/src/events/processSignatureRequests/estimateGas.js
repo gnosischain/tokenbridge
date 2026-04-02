@@ -14,35 +14,56 @@ async function estimateGas({ web3, homeBridge, validatorContract, signature, mes
       throw e
     }
 
-    // Check if minimum number of validations was already reached
-    logger.debug('Check if minimum number of validations was reached')
     const messageHash = web3.utils.soliditySha3(message)
-    const numMessagesSigned = await homeBridge.methods.numMessagesSigned(messageHash).call()
-    const alreadyProcessed = await homeBridge.methods.isAlreadyProcessed(numMessagesSigned).call()
 
-    if (alreadyProcessed) {
-      throw new AlreadyProcessedError(e.message)
+    // Check if minimum number of validations was already reached
+    try {
+      logger.debug('Check if minimum number of validations was reached')
+      const numMessagesSigned = await homeBridge.methods.numMessagesSigned(messageHash).call()
+      const alreadyProcessed = await homeBridge.methods.isAlreadyProcessed(numMessagesSigned).call()
+
+      if (alreadyProcessed) {
+        throw new AlreadyProcessedError(e.message)
+      }
+    } catch (processedError) {
+      if (processedError instanceof AlreadyProcessedError) {
+        throw processedError
+      }
+      logger.debug('Failed to check processed status: %s', processedError.message)
     }
 
     // Check if transaction was already signed by this validator
-    logger.debug('Check if transaction was already signed')
-    const validatorMessageHash = web3.utils.soliditySha3(address, web3.utils.soliditySha3(message))
-    const alreadySigned = await homeBridge.methods.messagesSigned(validatorMessageHash).call()
+    try {
+      logger.debug('Check if transaction was already signed')
+      const validatorMessageHash = web3.utils.soliditySha3(address, web3.utils.soliditySha3(message))
+      const alreadySigned = await homeBridge.methods.messagesSigned(validatorMessageHash).call()
 
-    if (alreadySigned) {
-      throw new AlreadySignedError(e.message)
+      if (alreadySigned) {
+        throw new AlreadySignedError(e.message)
+      }
+    } catch (signedError) {
+      if (signedError instanceof AlreadySignedError) {
+        throw signedError
+      }
+      logger.debug('Failed to check signed status: %s', signedError.message)
     }
 
     // Check if address is validator
-    logger.debug('Check if address is validator')
-    const isValidator = await validatorContract.methods.isValidator(address).call()
+    try {
+      logger.debug('Check if address is validator')
+      const isValidator = await validatorContract.methods.isValidator(address).call()
 
-    if (!isValidator) {
-      throw new InvalidValidatorError(`${address} is not a validator`)
+      if (!isValidator) {
+        throw new InvalidValidatorError(`${address} is not a validator`)
+      }
+    } catch (validatorError) {
+      if (validatorError instanceof InvalidValidatorError) {
+        throw validatorError
+      }
+      logger.debug('Failed to check validator status: %s', validatorError.message)
     }
 
-    logger.error('Unrecognized error')
-    throw new Error('Unknown error while processing message')
+    throw new AlreadyProcessedError(`submitSignature reverted for unknown reason: ${e.message}`)
   }
 }
 
