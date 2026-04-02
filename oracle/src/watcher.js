@@ -36,9 +36,9 @@ const {
   chain,
   reprocessingOptions,
   blockPollingLimit,
-  syncCheckInterval
+  syncCheckInterval,
+  beaconChainUrl
 } = config.main
-let { beaconChainUrl } = config.main
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
@@ -52,7 +52,7 @@ async function initialize() {
     web3.currentProvider.urls.forEach(checkHttps(chain))
     web3.currentProvider.startSyncStateChecker(syncCheckInterval)
 
-    beaconChainUrl = checkHttps(beaconChainUrl, logger)
+    checkHttps(chain)(beaconChainUrl)
 
     await getLastProcessedBlock()
     await getLastReprocessedBlock()
