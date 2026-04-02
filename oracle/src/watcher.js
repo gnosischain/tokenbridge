@@ -36,9 +36,9 @@ const {
   chain,
   reprocessingOptions,
   blockPollingLimit,
-  syncCheckInterval,
-  beaconChainUrl
+  syncCheckInterval
 } = config.main
+let { beaconChainUrl } = config.main
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
