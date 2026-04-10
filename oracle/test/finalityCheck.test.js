@@ -66,7 +66,7 @@ describe('blockFinalityCheck', () => {
       try {
         await checkLastFinalizedBlock(['https://example.com/finalized'])
       } catch (e) {
-        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed')).to.be.true
+        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed, no cached block available')).to.be.true
         expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
       }
     })
@@ -146,7 +146,7 @@ describe('blockFinalityCheck', () => {
       } catch (e) {
         expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
         expect(sendGetStub.calledTwice).to.be.true
-        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed')).to.be.true
+        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed, no cached block available')).to.be.true
       }
     })
 
@@ -195,8 +195,47 @@ describe('blockFinalityCheck', () => {
         await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
       } catch (e) {
         expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
-        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed')).to.be.true
+        expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed, no cached block available')).to.be.true
       }
+    })
+
+    it('should return cached block when all URLs fail after a previous success', async () => {
+      const mockResult = {
+        data: {
+          message: {
+            body: {
+              execution_payload: {
+                block_number: '99999'
+              }
+            }
+          }
+        }
+      }
+
+      // First call succeeds — populates cache
+      sendGetStub.resolves(mockResult)
+      const result1 = await checkLastFinalizedBlock(['https://beacon1.com'])
+      expect(result1).to.equal('99999')
+
+      // Second call — all URLs fail, should return cached block
+      sendGetStub.rejects(new Error('Beacon down'))
+      const result2 = await checkLastFinalizedBlock(['https://beacon1.com'])
+      expect(result2).to.equal('99999')
+      expect(loggerStub.warn.calledWith('All beacon chain URLs and EL RPC URLs failed, using cached finalized block: 99999')).to.be.true
+    })
+
+    it('should update cache when EL RPC fallback succeeds', async () => {
+      // First call — beacon fails, EL succeeds
+      sendGetStub.rejects(new Error('Beacon down'))
+      sendStub.resolves({ jsonrpc: '2.0', id: 1, result: { number: '0xc350' } })
+      const result1 = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(result1).to.equal('50000')
+
+      // Second call — all fail, should return cached block from EL
+      sendStub.rejects(new Error('EL down'))
+      const result2 = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(result2).to.equal('50000')
+      expect(loggerStub.warn.calledWith('All beacon chain URLs and EL RPC URLs failed, using cached finalized block: 50000')).to.be.true
     })
   })
 
@@ -321,7 +360,7 @@ describe('blockFinalityCheck', () => {
           await getLastBlockToProcess('https://beacon.rpc.com', web3Stub, bridgeContractStub)
         } catch (e) {
           expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
-          expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed')).to.be.true
+          expect(loggerStub.error.calledWith('All beacon chain URLs and EL RPC URLs failed, no cached block available')).to.be.true
         }
       })
     })

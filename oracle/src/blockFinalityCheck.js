@@ -2,6 +2,9 @@ require('../env')
 const { sendGet, send } = require('./services/HttpListProvider')
 const logger = require('./services/logger')
 
+// Cache for the last successfully queried finalized block
+let cachedFinalizedBlock = null
+
 /// @param urls: an array of beacon chain urls
 /// @param elRpcUrls: an array of execution layer rpc urls (fallback)
 /// @dev get last finalized block and return the first valid block, throw error if can't find any
@@ -28,6 +31,7 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
       const blockNumber = result && result.data && result.data.message && result.data.message.body && result.data.message.body.execution_payload && result.data.message.body.execution_payload.block_number
       if (blockNumber) {
         logger.info(`Last finalized block: ${blockNumber} (from beacon URL ${i + 1})`)
+        cachedFinalizedBlock = blockNumber
         return blockNumber
       } else {
         logger.warn(`Empty or invalid response from beacon URL ${i + 1}: ${url}`)
@@ -56,6 +60,7 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
       if (hexBlockNumber) {
         const blockNumber = parseInt(hexBlockNumber, 16).toString()
         logger.info(`Last finalized block: ${blockNumber} (from EL RPC URL ${i + 1})`)
+        cachedFinalizedBlock = blockNumber
         return blockNumber
       } else {
         logger.warn(`Empty or invalid response from EL RPC URL ${i + 1}: ${elUrls[i]}`)
@@ -67,7 +72,13 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
     }
   }
 
-  logger.error('All beacon chain URLs and EL RPC URLs failed')
+  // Fallback: use cached finalized block from last successful query
+  if (cachedFinalizedBlock) {
+    logger.warn(`All beacon chain URLs and EL RPC URLs failed, using cached finalized block: ${cachedFinalizedBlock}`)
+    return cachedFinalizedBlock
+  }
+
+  logger.error('All beacon chain URLs and EL RPC URLs failed, no cached block available')
   throw new Error('Cannot obtain latest finalized block from any provided URL')
 }
 
