@@ -52,7 +52,9 @@ async function initialize() {
     web3.currentProvider.urls.forEach(checkHttps(chain))
     web3.currentProvider.startSyncStateChecker(syncCheckInterval)
 
-    checkHttps(chain)(beaconChainUrl)
+    if (beaconChainUrl.length > 0) {
+      beaconChainUrl.forEach(checkHttps(chain))
+    }
 
     if (startBlock == null) {
       const latestBlock = await getBlockNumber(web3)
