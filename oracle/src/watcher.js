@@ -221,10 +221,10 @@ function addSeenEvents(events) {
 }
 
 // Dev: Switch from checking on-chain required block confirmation to beacon chain finalized block
-async function getLastBlockToProcess(beaconChainUrls) {
+async function getLastBlockToProcess(beaconChainUrls, elRpcUrls) {
   logger.info('Checking last finalized block')
   // Fetch last finalized block:
-  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls)
+  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
 
   return lastFinalizedBlock
 }
@@ -241,7 +241,8 @@ async function main({ sendToQueue }) {
       logger.info(`Oracle watcher was unsuspended.`)
     }
 
-    const lastBlockToProcess = await getLastBlockToProcess(beaconChainUrl)
+    const elRpcUrls = web3.currentProvider.urls || []
+    const lastBlockToProcess = await getLastBlockToProcess(beaconChainUrl, elRpcUrls)
     if (lastBlockToProcess == null) {
       logger.debug('Error return lastBlockToProcess')
       return
