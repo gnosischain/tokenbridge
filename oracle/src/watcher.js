@@ -4,7 +4,7 @@ const { connectWatcherToQueue, connection } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
-const { getEvents } = require('./tx/web3')
+const { getBlockNumber, getEvents } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
 const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS } = require('./utils/constants')
 const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
@@ -42,7 +42,7 @@ const {
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
-let lastProcessedBlock = Math.max(startBlock - 1, 0) // TODO: remove startBlock from env, always start with lastFinalizedBlock
+let lastProcessedBlock = startBlock != null ? Math.max(startBlock - 1, 0) : 0
 let lastReprocessedBlock
 
 async function initialize() {
@@ -54,6 +54,11 @@ async function initialize() {
 
     checkHttps(chain)(beaconChainUrl)
 
+    if (startBlock == null) {
+      const latestBlock = await getBlockNumber(web3)
+      logger.info({ latestBlock }, 'START_BLOCK not provided, using latest block from RPC')
+      lastProcessedBlock = latestBlock
+    }
     await getLastProcessedBlock()
     await getLastReprocessedBlock()
     await checkConditions()
@@ -259,7 +264,7 @@ async function main({ sendToQueue }) {
       return
     }
 
-    const fromBlock = lastProcessedBlock === 0 ? lastBlockToProcess : lastProcessedBlock + 1
+    const fromBlock = lastProcessedBlock + 1
     const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
     let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
 
@@ -268,13 +273,25 @@ async function main({ sendToQueue }) {
       return
     }
 
-    let events = await getEvents({
-      contract: eventContract,
-      event: config.event,
-      fromBlock,
-      toBlock,
-      filter: config.eventFilter
-    })
+    let events
+    try {
+      events = await getEvents({
+        contract: eventContract,
+        event: config.event,
+        fromBlock,
+        toBlock,
+        filter: config.eventFilter
+      })
+    } catch (e) {
+      logger.warn(
+        { fromBlock, toBlock, error: e.message },
+        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC'
+      )
+      const latestBlock = await getBlockNumber(web3)
+      logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
+      await updateLastProcessedBlock(latestBlock)
+      return
+    }
     logger.info(`Found ${events.length} ${config.event} events`)
 
     if (events.length) {
