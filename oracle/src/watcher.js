@@ -37,7 +37,7 @@ const {
   reprocessingOptions,
   blockPollingLimit,
   syncCheckInterval,
-  beaconChainUrl
+  beaconChainUrl,
 } = config.main
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
@@ -66,7 +66,7 @@ async function initialize() {
     await checkConditions()
     connectWatcherToQueue({
       queueName: config.queue,
-      cb: runMain
+      cb: runMain,
     })
   } catch (e) {
     logger.error(e)
@@ -78,10 +78,14 @@ async function runMain({ sendToQueue }) {
   try {
     if (connection.isConnected() && redis.status === 'ready') {
       if (config.maxProcessingTime) {
-        await watchdog(() => main({ sendToQueue }), config.maxProcessingTime, () => {
-          logger.fatal('Max processing time reached')
-          process.exit(EXIT_CODES.MAX_TIME_REACHED)
-        })
+        await watchdog(
+          () => main({ sendToQueue }),
+          config.maxProcessingTime,
+          () => {
+            logger.fatal('Max processing time reached')
+            process.exit(EXIT_CODES.MAX_TIME_REACHED)
+          },
+        )
       } else {
         await main({ sendToQueue })
       }
@@ -162,7 +166,7 @@ async function checkConditions() {
   }
 }
 
-const eventKey = e => `${e.transactionHash}-${e.logIndex}`
+const eventKey = (e) => `${e.transactionHash}-${e.logIndex}`
 
 async function reprocessOldLogs(sendToQueue) {
   const fromBlock = lastReprocessedBlock + 1
@@ -172,10 +176,10 @@ async function reprocessOldLogs(sendToQueue) {
     event: config.event,
     fromBlock,
     toBlock,
-    filter: config.eventFilter
+    filter: config.eventFilter,
   })
   const alreadySeenEvents = await getSeenEvents(fromBlock, toBlock)
-  const missingEvents = events.filter(e => !alreadySeenEvents[eventKey(e)])
+  const missingEvents = events.filter((e) => !alreadySeenEvents[eventKey(e)])
   if (missingEvents.length === 0) {
     logger.debug('No missed events were found')
   } else {
@@ -184,7 +188,7 @@ async function reprocessOldLogs(sendToQueue) {
     if (config.id === 'amb-information-request') {
       // obtain block number and events from the earliest block
       const batchBlockNumber = missingEvents[0].blockNumber
-      const batchEvents = missingEvents.filter(event => event.blockNumber === batchBlockNumber)
+      const batchEvents = missingEvents.filter((event) => event.blockNumber === batchBlockNumber)
 
       // if there are some other events in the later blocks,
       // adjust lastReprocessedBlock so that these events will be processed again on the next iteration
@@ -213,7 +217,7 @@ async function reprocessOldLogs(sendToQueue) {
 async function getSeenEvents(fromBlock, toBlock) {
   const keys = await redis.zrangebyscore(seenEventsRedisKey, fromBlock, toBlock)
   const res = {}
-  keys.forEach(k => {
+  keys.forEach((k) => {
     res[k] = true
   })
   return res
@@ -224,7 +228,7 @@ function deleteSeenEvents(fromBlock, toBlock) {
 }
 
 function addSeenEvents(events) {
-  return redis.zadd(seenEventsRedisKey, ...events.flatMap(e => [e.blockNumber, eventKey(e)]))
+  return redis.zadd(seenEventsRedisKey, ...events.flatMap((e) => [e.blockNumber, eventKey(e)]))
 }
 
 // Dev: Switch from checking on-chain required block confirmation to beacon chain finalized block
@@ -250,10 +254,7 @@ async function main({ sendToQueue }) {
 
     const elRpcUrls = web3.currentProvider.urls || []
     const lastBlockToProcess = await getLastBlockToProcess(beaconChainUrl, elRpcUrls)
-    if (lastBlockToProcess == null) {
-      logger.debug('Error return lastBlockToProcess')
-      return
-    }
+
     if (reprocessingOptions.enabled) {
       if (lastReprocessedBlock + reprocessingOptions.batchSize + reprocessingOptions.blockDelay < lastBlockToProcess) {
         await reprocessOldLogs(sendToQueue)
@@ -282,12 +283,12 @@ async function main({ sendToQueue }) {
         event: config.event,
         fromBlock,
         toBlock,
-        filter: config.eventFilter
+        filter: config.eventFilter,
       })
     } catch (e) {
       logger.warn(
         { fromBlock, toBlock, error: e.message },
-        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC'
+        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC',
       )
       const latestBlock = await getBlockNumber(web3)
       logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
@@ -303,7 +304,7 @@ async function main({ sendToQueue }) {
       if (config.id === 'amb-information-request') {
         // obtain block number and events from the earliest block
         const batchBlockNumber = events[0].blockNumber
-        const batchEvents = events.filter(event => event.blockNumber === batchBlockNumber)
+        const batchEvents = events.filter((event) => event.blockNumber === batchBlockNumber)
 
         // if there are some other events in the later blocks,
         // adjust lastProcessedBlock so that these events will be processed again on the next iteration

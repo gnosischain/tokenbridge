@@ -4,7 +4,12 @@ const { HttpListProviderError } = require('../../services/HttpListProvider')
 const { ZERO_ADDRESS } = require('../../../../commons')
 const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
-const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  AlreadySignedError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
 const estimateGas = require('../processAffirmationRequests/estimateGas')
 
@@ -101,6 +106,12 @@ function processTransfersBuilder(config) {
             return
           } else if (e instanceof AlreadyProcessedError) {
             logger.info(`transfer ${transfer.transactionHash} was already processed by other validators`)
+            return
+          } else if (e instanceof EstimateGasError) {
+            logger.error(
+              e,
+              `Gas estimation failed for unknown reason, skipping transfer ${transfer.transactionHash}`
+            )
             return
           } else {
             logger.error(e, 'Unknown error while processing transaction')

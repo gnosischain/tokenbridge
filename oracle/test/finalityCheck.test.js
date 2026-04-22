@@ -103,7 +103,7 @@ describe('blockFinalityCheck', () => {
       expect(loggerStub.info.calledWith('Last finalized block: 123532 (from beacon URL 1)')).to.be.true
       expect(sendGetStub.calledOnce).to.be.true
       expect(
-        sendGetStub.calledWith('https://examples.com/finalized', {
+        sendGetStub.calledWith('https://examples.com/finalized/eth/v1/beacon/blocks/finalized', {
           requestTimeout: 30000
         })
       ).to.be.true

@@ -1,5 +1,10 @@
 const { HttpListProviderError } = require('../../services/HttpListProvider')
-const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  AlreadySignedError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const logger = require('../../services/logger').child({
   module: 'processSignatureRequests:estimateGas'
 })
@@ -63,7 +68,7 @@ async function estimateGas({ web3, homeBridge, validatorContract, signature, mes
       logger.debug('Failed to check validator status: %s', validatorError.message)
     }
 
-    throw new AlreadyProcessedError(`submitSignature reverted for unknown reason: ${e.message}`)
+    throw new EstimateGasError(`submitSignature reverted for unknown reason: ${e.message}`)
   }
 }
 

@@ -1,6 +1,11 @@
 const Web3 = require('web3')
 const { HttpListProviderError } = require('../../services/HttpListProvider')
-const { AlreadyProcessedError, IncompatibleContractError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  IncompatibleContractError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const { parseMessage } = require('../../utils/message')
 const logger = require('../../services/logger').child({
   module: 'processCollectedSignatures:estimateGas'
@@ -73,7 +78,7 @@ async function estimateGas({
       logger.debug('Failed to check validator status: %s', validatorError.message)
     }
 
-    throw new AlreadyProcessedError(`executeSignatures reverted for unknown reason: ${e.message}`)
+    throw new EstimateGasError(`executeSignatures reverted for unknown reason: ${e.message}`)
   }
 }
 

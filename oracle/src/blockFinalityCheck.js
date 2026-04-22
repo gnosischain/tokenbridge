@@ -28,8 +28,9 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
       logger.info(`Trying beacon chain URL ${i + 1}/${urlArray.length}: ${url}`)
       const result = await sendGet(url, options)
 
-      const blockNumber = result && result.data && result.data.message && result.data.message.body && result.data.message.body.execution_payload && result.data.message.body.execution_payload.block_number
-      if (blockNumber) {
+      const rawBlockNumber = result && result.data && result.data.message && result.data.message.body && result.data.message.body.execution_payload && result.data.message.body.execution_payload.block_number
+      if (rawBlockNumber) {
+        const blockNumber = Number(rawBlockNumber)
         logger.info(`Last finalized block: ${blockNumber} (from beacon URL ${i + 1})`)
         cachedFinalizedBlock = blockNumber
         return blockNumber
@@ -58,7 +59,7 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
 
       const hexBlockNumber = result && result.result && result.result.number
       if (hexBlockNumber) {
-        const blockNumber = parseInt(hexBlockNumber, 16).toString()
+        const blockNumber = parseInt(hexBlockNumber, 16)
         logger.info(`Last finalized block: ${blockNumber} (from EL RPC URL ${i + 1})`)
         cachedFinalizedBlock = blockNumber
         return blockNumber
@@ -75,7 +76,7 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
   // Fallback: use cached finalized block from last successful query
   if (cachedFinalizedBlock) {
     logger.warn(`All beacon chain URLs and EL RPC URLs failed, using cached finalized block: ${cachedFinalizedBlock}`)
-    return cachedFinalizedBlock
+    return Number(cachedFinalizedBlock)
   }
 
   logger.error('All beacon chain URLs and EL RPC URLs failed, no cached block available')

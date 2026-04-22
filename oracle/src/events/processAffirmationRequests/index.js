@@ -10,7 +10,8 @@ const {
   AlreadyProcessedError,
   AlreadySignedError,
   InvalidValidatorError,
-  NotApprovedByHashiError
+  NotApprovedByHashiError,
+  EstimateGasError
 } = require('../../utils/errors')
 const { getRetryQueue, deleteFromRetryList } = require('../../utils/sendToRetryQueue')
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
@@ -114,6 +115,12 @@ function processAffirmationRequestsBuilder(config) {
           } else if (e instanceof NotApprovedByHashiError) {
             logger.info(
               `tx with tx hash ${affirmationRequest.transactionHash} is not approved by Hashi, wait for retry`
+            )
+            return
+          } else if (e instanceof EstimateGasError) {
+            logger.error(
+              e,
+              `Gas estimation failed for unknown reason, skipping affirmationRequest ${affirmationRequest.transactionHash}`
             )
             return
           } else {

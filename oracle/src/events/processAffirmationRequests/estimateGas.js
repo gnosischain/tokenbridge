@@ -3,7 +3,8 @@ const {
   AlreadyProcessedError,
   AlreadySignedError,
   InvalidValidatorError,
-  NotApprovedByHashiError
+  NotApprovedByHashiError,
+  EstimateGasError
 } = require('../../utils/errors')
 const logger = require('../../services/logger').child({
   module: 'processAffirmationRequests:estimateGas'
@@ -96,7 +97,7 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
       logger.debug('Failed to check validator status: %s', validatorError.message)
     }
 
-    throw new AlreadyProcessedError(`executeAffirmation reverted for unknown reason: ${e.message}`)
+    throw new EstimateGasError(`executeAffirmation reverted for unknown reason: ${e.message}`)
   }
 }
 
