@@ -6,7 +6,7 @@ const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
 const { getBlockNumber, getEvents } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
-const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS } = require('./utils/constants')
+const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS, MAX_CONSECUTIVE_FAILURES } = require('./utils/constants')
 const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
 
 if (process.argv.length < 3) {
@@ -44,6 +44,7 @@ const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
 let lastProcessedBlock = startBlock != null ? Math.max(startBlock - 1, 0) : 0
 let lastReprocessedBlock
+let consecutiveFailures = 0
 
 async function initialize() {
   try {
@@ -241,6 +242,7 @@ async function getLastBlockToProcess(beaconChainUrls, elRpcUrls) {
 }
 
 async function main({ sendToQueue }) {
+  let intendedToBlock = null
   try {
     const wasShutdown = await getShutdownFlag(logger, config.shutdownKey, false)
     if (await getShutdownFlag(logger, config.shutdownKey, true)) {
@@ -270,6 +272,7 @@ async function main({ sendToQueue }) {
     const fromBlock = lastProcessedBlock + 1
     const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
     let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
+    intendedToBlock = toBlock
 
     if (toBlock < fromBlock) {
       logger.info(`From block < to block: skip processing and wait until the next cycle`)
@@ -293,6 +296,7 @@ async function main({ sendToQueue }) {
       const latestBlock = await getBlockNumber(web3)
       logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
       await updateLastProcessedBlock(latestBlock)
+      consecutiveFailures = 0
       return
     }
     logger.info(`Found ${events.length} ${config.event} events`)
@@ -334,8 +338,23 @@ async function main({ sendToQueue }) {
 
     logger.debug({ lastProcessedBlock: toBlock.toString() }, 'Updating last processed block')
     await updateLastProcessedBlock(toBlock)
+    consecutiveFailures = 0
   } catch (e) {
-    logger.error(e)
+    consecutiveFailures++
+    logger.error({ consecutiveFailures }, e.message)
+
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES && intendedToBlock !== null) {
+      logger.fatal(
+        {
+          skipFrom: lastProcessedBlock + 1,
+          skipTo: intendedToBlock,
+          failures: consecutiveFailures
+        },
+        `Watcher stuck for ${consecutiveFailures} consecutive attempts — force-advancing lastProcessedBlock past the stuck range to avoid poison-pill wedging. Events in the skipped range will not be processed.`
+      )
+      await updateLastProcessedBlock(intendedToBlock)
+      consecutiveFailures = 0
+    }
   }
 
   logger.debug('Finished')
