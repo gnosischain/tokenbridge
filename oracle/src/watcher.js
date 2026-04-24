@@ -46,6 +46,14 @@ let lastProcessedBlock = startBlock != null ? Math.max(startBlock - 1, 0) : 0
 let lastReprocessedBlock
 let consecutiveFailures = 0
 
+class EventProcessingError extends Error {
+  constructor(cause) {
+    super(cause.message)
+    this.name = 'EventProcessingError'
+    this.cause = cause
+  }
+}
+
 async function initialize() {
   try {
     const checkHttps = checkHTTPS(process.env.ORACLE_ALLOW_HTTP_FOR_RPC, logger)
@@ -318,13 +326,21 @@ async function main({ sendToQueue }) {
           events = batchEvents
         }
 
-        job = await processAMBInformationRequests(events)
+        try {
+          job = await processAMBInformationRequests(events)
+        } catch (e) {
+          throw new EventProcessingError(e)
+        }
         if (job === null) {
           logger.debug('No job to send')
           return
         }
       } else {
-        job = await processEvents(events)
+        try {
+          job = await processEvents(events)
+        } catch (e) {
+          throw new EventProcessingError(e)
+        }
       }
 
       if (job != null && job.length > 0) {
@@ -340,8 +356,14 @@ async function main({ sendToQueue }) {
     await updateLastProcessedBlock(toBlock)
     consecutiveFailures = 0
   } catch (e) {
-    consecutiveFailures++
-    logger.error({ consecutiveFailures }, e.message)
+    const isEventProcessingFailure = e instanceof EventProcessingError
+    if (intendedToBlock !== null && isEventProcessingFailure) {
+      consecutiveFailures++
+    }
+    logger.error(
+      { consecutiveFailures, inFlight: intendedToBlock !== null, eventProcessingFailure: isEventProcessingFailure },
+      e.message,
+    )
 
     if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES && intendedToBlock !== null) {
       logger.fatal(
