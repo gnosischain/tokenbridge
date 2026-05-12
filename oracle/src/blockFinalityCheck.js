@@ -23,7 +23,7 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
 
   // Try each beacon chain URL in order until one succeeds
   for (let i = 0; i < urlArray.length; i++) {
-    const url = `${urlArray[i]}/eth/v1/beacon/blocks/finalized`
+    const url = `${urlArray[i]}/eth/v2/beacon/blocks/finalized`
     try {
       logger.info(`Trying beacon chain URL ${i + 1}/${urlArray.length}: ${url}`)
       const result = await sendGet(url, options)
