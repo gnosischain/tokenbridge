@@ -5,7 +5,12 @@ const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
 const { createxDAIMessage } = require('../../utils/message')
 const estimateGas = require('./estimateGas')
-const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  AlreadySignedError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS, DAI_ADDRESS, USDS_ADDRESS } = require('../../utils/constants')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
@@ -84,6 +89,12 @@ function processSignatureRequestsBuilder(config) {
           } else if (e instanceof AlreadyProcessedError) {
             logger.info(
               `signatureRequest ${signatureRequest.transactionHash} was already processed by other validators`
+            )
+            return
+          } else if (e instanceof EstimateGasError) {
+            logger.error(
+              e,
+              `Gas estimation failed for unknown reason, skipping signatureRequest ${signatureRequest.transactionHash}`
             )
             return
           } else {

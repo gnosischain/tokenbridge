@@ -6,7 +6,12 @@ const { getValidatorContract } = require('../../tx/web3')
 const { signatureToVRS, packSignatures, parseMessage } = require('../../utils/message')
 const { readAccessListFile } = require('../../utils/utils')
 const estimateGas = require('./estimateGas')
-const { AlreadyProcessedError, IncompatibleContractError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  IncompatibleContractError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const { MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
 
 const {
@@ -136,6 +141,12 @@ function processCollectedSignaturesBuilder(config) {
             return
           } else if (e instanceof IncompatibleContractError || e instanceof InvalidValidatorError) {
             logger.error(`The message couldn't be processed; skipping: ${e.message}`)
+            return
+          } else if (e instanceof EstimateGasError) {
+            logger.error(
+              e,
+              `Gas estimation failed for unknown reason, skipping CollectedSignatures ${colSignature.transactionHash}`
+            )
             return
           } else {
             logger.error(e, 'Unknown error while processing transaction')

@@ -39,7 +39,9 @@ const {
   ORACLE_FOREIGN_EVENTS_REPROCESSING,
   ORACLE_FOREIGN_EVENTS_REPROCESSING_BATCH_SIZE,
   ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY,
-  ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL
+  ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL,
+  ORACLE_FOREIGN_BEACON_URL,
+  ORACLE_HOME_BEACON_URL
 } = process.env
 
 let homeAbi
@@ -74,7 +76,7 @@ const homeConfig = {
   bridgeABI: homeAbi,
   pollingInterval: parseInt(ORACLE_HOME_RPC_POLLING_INTERVAL, 10),
   syncCheckInterval: parseInt(ORACLE_HOME_RPC_SYNC_STATE_CHECK_INTERVAL, 10) || 60000,
-  startBlock: parseInt(ORACLE_HOME_START_BLOCK, 10) || 0,
+  startBlock: ORACLE_HOME_START_BLOCK ? parseInt(ORACLE_HOME_START_BLOCK, 10) : null,
   blockPollingLimit: parseInt(ORACLE_HOME_RPC_BLOCK_POLLING_LIMIT, 10),
   web3: web3Home,
   web3Redundant: web3HomeRedundant,
@@ -85,7 +87,8 @@ const homeConfig = {
     enabled: ORACLE_HOME_EVENTS_REPROCESSING === 'true',
     batchSize: parseInt(ORACLE_HOME_EVENTS_REPROCESSING_BATCH_SIZE, 10) || 1000,
     blockDelay: parseInt(ORACLE_HOME_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 500
-  }
+  },
+  beaconChainUrl: ORACLE_HOME_BEACON_URL ? ORACLE_HOME_BEACON_URL.split(',').map(url => url.trim()).filter(url => url) : []
 }
 
 const foreignContract = new web3Foreign.eth.Contract(foreignAbi, COMMON_FOREIGN_BRIDGE_ADDRESS)
@@ -95,7 +98,7 @@ const foreignConfig = {
   bridgeABI: foreignAbi,
   pollingInterval: parseInt(ORACLE_FOREIGN_RPC_POLLING_INTERVAL, 10),
   syncCheckInterval: parseInt(ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL, 10) || 60000,
-  startBlock: parseInt(ORACLE_FOREIGN_START_BLOCK, 10) || 0,
+  startBlock: ORACLE_FOREIGN_START_BLOCK ? parseInt(ORACLE_FOREIGN_START_BLOCK, 10) : null,
   blockPollingLimit: parseInt(ORACLE_FOREIGN_RPC_BLOCK_POLLING_LIMIT, 10),
   web3: web3Foreign,
   web3Redundant: web3ForeignRedundant,
@@ -107,7 +110,8 @@ const foreignConfig = {
     enabled: ORACLE_FOREIGN_EVENTS_REPROCESSING === 'true',
     batchSize: parseInt(ORACLE_FOREIGN_EVENTS_REPROCESSING_BATCH_SIZE, 10) || 500,
     blockDelay: parseInt(ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 250
-  }
+  },
+  beaconChainUrl: ORACLE_FOREIGN_BEACON_URL ? ORACLE_FOREIGN_BEACON_URL.split(',').map(url => url.trim()).filter(url => url) : []
 }
 
 const maxProcessingTime =

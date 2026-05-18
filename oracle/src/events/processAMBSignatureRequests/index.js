@@ -5,7 +5,12 @@ const rootLogger = require('../../services/logger')
 const { getValidatorContract } = require('../../tx/web3')
 const { parseAMBMessage } = require('../../../../commons')
 const estimateGas = require('../processSignatureRequests/estimateGas')
-const { AlreadyProcessedError, AlreadySignedError, InvalidValidatorError } = require('../../utils/errors')
+const {
+  AlreadyProcessedError,
+  AlreadySignedError,
+  InvalidValidatorError,
+  EstimateGasError
+} = require('../../utils/errors')
 const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
@@ -60,6 +65,9 @@ function processSignatureRequestsBuilder(config) {
             return
           } else if (e instanceof AlreadyProcessedError) {
             logger.info(`signatureRequest ${messageId} was already processed by other validators`)
+            return
+          } else if (e instanceof EstimateGasError) {
+            logger.error(e, `Gas estimation failed for unknown reason, skipping signatureRequest ${messageId}`)
             return
           } else {
             logger.error(e, 'Unknown error while processing transaction')

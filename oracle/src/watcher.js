@@ -4,9 +4,10 @@ const { connectWatcherToQueue, connection } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
-const { getBlockNumber, getRequiredBlockConfirmations, getEvents } = require('./tx/web3')
+const { getBlockNumber, getEvents } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
-const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS } = require('./utils/constants')
+const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS, MAX_CONSECUTIVE_FAILURES } = require('./utils/constants')
+const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
 
 if (process.argv.length < 3) {
   logger.error('Please check the number of arguments, config file was not provided')
@@ -35,13 +36,23 @@ const {
   chain,
   reprocessingOptions,
   blockPollingLimit,
-  syncCheckInterval
+  syncCheckInterval,
+  beaconChainUrl,
 } = config.main
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
-let lastProcessedBlock = Math.max(startBlock - 1, 0)
+let lastProcessedBlock = startBlock != null ? Math.max(startBlock - 1, 0) : 0
 let lastReprocessedBlock
+let consecutiveFailures = 0
+
+class EventProcessingError extends Error {
+  constructor(cause) {
+    super(cause.message)
+    this.name = 'EventProcessingError'
+    this.cause = cause
+  }
+}
 
 async function initialize() {
   try {
@@ -50,12 +61,21 @@ async function initialize() {
     web3.currentProvider.urls.forEach(checkHttps(chain))
     web3.currentProvider.startSyncStateChecker(syncCheckInterval)
 
+    if (beaconChainUrl.length > 0) {
+      beaconChainUrl.forEach(checkHttps(chain))
+    }
+
+    if (startBlock == null) {
+      const latestBlock = await getBlockNumber(web3)
+      logger.info({ latestBlock }, 'START_BLOCK not provided, using latest block from RPC')
+      lastProcessedBlock = latestBlock
+    }
     await getLastProcessedBlock()
     await getLastReprocessedBlock()
     await checkConditions()
     connectWatcherToQueue({
       queueName: config.queue,
-      cb: runMain
+      cb: runMain,
     })
   } catch (e) {
     logger.error(e)
@@ -67,10 +87,14 @@ async function runMain({ sendToQueue }) {
   try {
     if (connection.isConnected() && redis.status === 'ready') {
       if (config.maxProcessingTime) {
-        await watchdog(() => main({ sendToQueue }), config.maxProcessingTime, () => {
-          logger.fatal('Max processing time reached')
-          process.exit(EXIT_CODES.MAX_TIME_REACHED)
-        })
+        await watchdog(
+          () => main({ sendToQueue }),
+          config.maxProcessingTime,
+          () => {
+            logger.fatal('Max processing time reached')
+            process.exit(EXIT_CODES.MAX_TIME_REACHED)
+          },
+        )
       } else {
         await main({ sendToQueue })
       }
@@ -151,7 +175,7 @@ async function checkConditions() {
   }
 }
 
-const eventKey = e => `${e.transactionHash}-${e.logIndex}`
+const eventKey = (e) => `${e.transactionHash}-${e.logIndex}`
 
 async function reprocessOldLogs(sendToQueue) {
   const fromBlock = lastReprocessedBlock + 1
@@ -161,10 +185,10 @@ async function reprocessOldLogs(sendToQueue) {
     event: config.event,
     fromBlock,
     toBlock,
-    filter: config.eventFilter
+    filter: config.eventFilter,
   })
   const alreadySeenEvents = await getSeenEvents(fromBlock, toBlock)
-  const missingEvents = events.filter(e => !alreadySeenEvents[eventKey(e)])
+  const missingEvents = events.filter((e) => !alreadySeenEvents[eventKey(e)])
   if (missingEvents.length === 0) {
     logger.debug('No missed events were found')
   } else {
@@ -173,7 +197,7 @@ async function reprocessOldLogs(sendToQueue) {
     if (config.id === 'amb-information-request') {
       // obtain block number and events from the earliest block
       const batchBlockNumber = missingEvents[0].blockNumber
-      const batchEvents = missingEvents.filter(event => event.blockNumber === batchBlockNumber)
+      const batchEvents = missingEvents.filter((event) => event.blockNumber === batchBlockNumber)
 
       // if there are some other events in the later blocks,
       // adjust lastReprocessedBlock so that these events will be processed again on the next iteration
@@ -202,7 +226,7 @@ async function reprocessOldLogs(sendToQueue) {
 async function getSeenEvents(fromBlock, toBlock) {
   const keys = await redis.zrangebyscore(seenEventsRedisKey, fromBlock, toBlock)
   const res = {}
-  keys.forEach(k => {
+  keys.forEach((k) => {
     res[k] = true
   })
   return res
@@ -213,18 +237,20 @@ function deleteSeenEvents(fromBlock, toBlock) {
 }
 
 function addSeenEvents(events) {
-  return redis.zadd(seenEventsRedisKey, ...events.flatMap(e => [e.blockNumber, eventKey(e)]))
+  return redis.zadd(seenEventsRedisKey, ...events.flatMap((e) => [e.blockNumber, eventKey(e)]))
 }
 
-async function getLastBlockToProcess(web3, bridgeContract) {
-  const [lastBlockNumber, requiredBlockConfirmations] = await Promise.all([
-    getBlockNumber(web3),
-    getRequiredBlockConfirmations(bridgeContract)
-  ])
-  return lastBlockNumber - requiredBlockConfirmations
+// Dev: Switch from checking on-chain required block confirmation to beacon chain finalized block
+async function getLastBlockToProcess(beaconChainUrls, elRpcUrls) {
+  logger.info('Checking last finalized block')
+  // Fetch last finalized block:
+  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
+
+  return lastFinalizedBlock
 }
 
 async function main({ sendToQueue }) {
+  let intendedToBlock = null
   try {
     const wasShutdown = await getShutdownFlag(logger, config.shutdownKey, false)
     if (await getShutdownFlag(logger, config.shutdownKey, true)) {
@@ -236,7 +262,8 @@ async function main({ sendToQueue }) {
       logger.info(`Oracle watcher was unsuspended.`)
     }
 
-    const lastBlockToProcess = await getLastBlockToProcess(web3, bridgeContract)
+    const elRpcUrls = web3.currentProvider.urls || []
+    const lastBlockToProcess = await getLastBlockToProcess(beaconChainUrl, elRpcUrls)
 
     if (reprocessingOptions.enabled) {
       if (lastReprocessedBlock + reprocessingOptions.batchSize + reprocessingOptions.blockDelay < lastBlockToProcess) {
@@ -253,14 +280,33 @@ async function main({ sendToQueue }) {
     const fromBlock = lastProcessedBlock + 1
     const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
     let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
+    intendedToBlock = toBlock
 
-    let events = await getEvents({
-      contract: eventContract,
-      event: config.event,
-      fromBlock,
-      toBlock,
-      filter: config.eventFilter
-    })
+    if (toBlock < fromBlock) {
+      logger.info(`From block < to block: skip processing and wait until the next cycle`)
+      return
+    }
+
+    let events
+    try {
+      events = await getEvents({
+        contract: eventContract,
+        event: config.event,
+        fromBlock,
+        toBlock,
+        filter: config.eventFilter,
+      })
+    } catch (e) {
+      logger.warn(
+        { fromBlock, toBlock, error: e.message },
+        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC',
+      )
+      const latestBlock = await getBlockNumber(web3)
+      logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
+      await updateLastProcessedBlock(latestBlock)
+      consecutiveFailures = 0
+      return
+    }
     logger.info(`Found ${events.length} ${config.event} events`)
 
     if (events.length) {
@@ -270,7 +316,7 @@ async function main({ sendToQueue }) {
       if (config.id === 'amb-information-request') {
         // obtain block number and events from the earliest block
         const batchBlockNumber = events[0].blockNumber
-        const batchEvents = events.filter(event => event.blockNumber === batchBlockNumber)
+        const batchEvents = events.filter((event) => event.blockNumber === batchBlockNumber)
 
         // if there are some other events in the later blocks,
         // adjust lastProcessedBlock so that these events will be processed again on the next iteration
@@ -280,17 +326,24 @@ async function main({ sendToQueue }) {
           events = batchEvents
         }
 
-        job = await processAMBInformationRequests(events)
-        if(job === null){
-          logger.debug("No job to send")
+        try {
+          job = await processAMBInformationRequests(events)
+        } catch (e) {
+          throw new EventProcessingError(e)
+        }
+        if (job === null) {
+          logger.debug('No job to send')
           return
         }
-    
       } else {
-        job = await processEvents(events)
+        try {
+          job = await processEvents(events)
+        } catch (e) {
+          throw new EventProcessingError(e)
+        }
       }
 
-      if (job!=null && job.length > 0){
+      if (job != null && job.length > 0) {
         logger.info('Transactions to send:', job.length)
         await sendToQueue(job)
       }
@@ -301,8 +354,29 @@ async function main({ sendToQueue }) {
 
     logger.debug({ lastProcessedBlock: toBlock.toString() }, 'Updating last processed block')
     await updateLastProcessedBlock(toBlock)
+    consecutiveFailures = 0
   } catch (e) {
-    logger.error(e)
+    const isEventProcessingFailure = e instanceof EventProcessingError
+    if (intendedToBlock !== null && isEventProcessingFailure) {
+      consecutiveFailures++
+    }
+    logger.error(
+      { consecutiveFailures, inFlight: intendedToBlock !== null, eventProcessingFailure: isEventProcessingFailure },
+      e.message,
+    )
+
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES && intendedToBlock !== null) {
+      logger.fatal(
+        {
+          skipFrom: lastProcessedBlock + 1,
+          skipTo: intendedToBlock,
+          failures: consecutiveFailures
+        },
+        `Watcher stuck for ${consecutiveFailures} consecutive attempts — force-advancing lastProcessedBlock past the stuck range to avoid poison-pill wedging. Events in the skipped range will not be processed.`
+      )
+      await updateLastProcessedBlock(intendedToBlock)
+      consecutiveFailures = 0
+    }
   }
 
   logger.debug('Finished')

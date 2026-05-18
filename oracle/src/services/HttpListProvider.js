@@ -176,9 +176,25 @@ function send(url, payload, options) {
     })
 }
 
+function sendGet(url, options = {}) {
+  return fetch(url, {
+    method: 'GET',
+    timeout: options.requestTimeout || 30000
+  })
+    .then(response => {
+      if (response.ok) {
+        return response
+      } else {
+        throw new Error(response.statusText)
+      }
+    })
+    .then(response => response.json())
+}
+
 module.exports = {
   HttpListProvider,
   HttpListProviderError,
   defaultOptions,
-  send
+  send,
+  sendGet
 }
