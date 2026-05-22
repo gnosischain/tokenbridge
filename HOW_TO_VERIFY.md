@@ -287,6 +287,44 @@ If you find a tag where the diff is non-empty under `/mono`, that is a finding w
 
 ---
 
+## Verify index digest (lightweight mode)
+
+A faster alternative to the full rebuild above: fetch the OCI **image index** for `v3.11.0` from Docker Hub and compare its SHA-256 against the value recorded by CI when the image was published. (`v3.11.0` is a multi-arch tag, so what the registry serves at this address is an image index — a.k.a. a Docker `manifest list` — pointing at the per-platform manifests, not a single-platform manifest itself.) This takes a few seconds, requires no local build, and needs only `curl`, `jq`, and `sha256sum`.
+
+**Trust trade-off.** This mode trusts that the index digest recorded for `v3.11.0` (in Appendix A and in the GitHub Actions run log) reflects what CI actually built. If the GitHub Actions runner was compromised and pushed an index that matches the recorded value, this check will still pass. The full rebuild procedure above does not require that trust — it independently verifies filesystem content from source. Use this lightweight mode when you have already established confidence in the publishing pipeline; use the full procedure when you have not.
+
+### Steps
+
+```bash
+# 1. Get an anonymous Docker Hub registry pull token.
+TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:gnosischain/tokenbridge-oracle:pull" | jq -r .token)
+
+# 2. Fetch the OCI image index for the tag.
+curl -sL \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.oci.image.index.v1+json" \
+  -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+  "https://registry-1.docker.io/v2/gnosischain/tokenbridge-oracle/manifests/v3.11.0" \
+  > index.json
+
+# 3. Hash the index.
+sha256sum index.json
+```
+
+**Expect:** the digest equals the OCI index value recorded in Appendix A:
+
+```
+714adb52aea9ddfe5d7fc93ee3f763f4c5a91e19fc51b939568ed5a08ee4d00b  index.json
+```
+
+The two `Accept` headers in step 2 are required — without them the registry falls back to returning a single-platform manifest (e.g. `linux/amd64`), which hashes to a different, per-platform digest (the `70ded02d…` value in Appendix A for `v3.11.0`). The value above is the index digest covering all platforms and is what `docker pull` reports as `Digest:` for `v3.11.0`.
+
+If the hash differs, the index currently served for `v3.11.0` does not match what CI recorded. Stop and investigate before deploying.
+
+To verify a different tag, replace `v3.11.0` in step 2 and compare against the recorded index digest for that tag (not the value above).
+
+---
+
 ## Appendix A — Reference values from the v3.11.0 verification run
 
 These are the expected values for the first recorded execution of this procedure (2026-05-21). If you are verifying `v3.11.0`, your results should match every row in the table marked "expected to match." If you are verifying a different tag, only the procedure is the same — the values themselves will be tag-specific (re-derive them from your run).
