@@ -14,13 +14,17 @@ jobs:
   publish:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get_tag.outputs.version }}
+      digest:  ${{ steps.build.outputs.digest }}
+      commit:  ${{ github.event.workflow_run.head_sha }}
     steps:
       # Step 1: Checkout the repository
       - name: Checkout
         uses: actions/checkout@v2
-      
+
       # Pointing to old repo of contracts: TODO add ABIS from tokenbridge-contracts
       # - name: Checkout
       #   uses: actions/checkout@v2
@@ -35,7 +39,7 @@ jobs:
         run: |
           git fetch --tags
           latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-          echo "::set-output name=version::$latest_tag"
+          echo "version=$latest_tag" >> "$GITHUB_OUTPUT"
 
       # Step 3: Login to Docker Hub
       - name: Login to Docker Hub
@@ -50,6 +54,7 @@ jobs:
 
       # Step 5: Build and push Docker image
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -58,14 +63,70 @@ jobs:
           no-cache: true
           tags: gnosischain/tokenbridge-oracle:${{ steps.get_tag.outputs.version }},gnosischain/tokenbridge-oracle:latest
 
+      # Step 6: Record (commit -> digest) binding for lightweight verification
+      - name: Record release binding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG:    ${{ steps.get_tag.outputs.version }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE:  gnosischain/tokenbridge-oracle
+          REPO:   ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$DIGEST" ]]; then
+            echo "::error::No digest emitted by build step — aborting." >&2
+            exit 1
+          fi
+
+          # 1. Workflow run summary (visible on the Actions tab)
+          {
+            echo "## Release binding"
+            echo
+            echo "| field  | value |"
+            echo "|--------|-------|"
+            echo "| tag    | \`$TAG\` |"
+            echo "| commit | \`$COMMIT\` |"
+            echo "| image  | \`$IMAGE:$TAG\` |"
+            echo "| digest | \`$DIGEST\` |"
+            echo
+            echo "Verify locally:"
+            echo
+            echo '```bash'
+            echo "ACTUAL=\$(docker buildx imagetools inspect $IMAGE:$TAG --format '{{.Manifest.Digest}}')"
+            echo "[ \"\$ACTUAL\" = \"$DIGEST\" ] && echo match || echo MISMATCH"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # 2. Durable: append the binding to the GitHub Release body
+          NOTES=$(cat <<EOF
+
+          ---
+
+          **Published image**
+
+          - image:  \`$IMAGE:$TAG\`
+          - digest: \`$DIGEST\`
+          - commit: \`$COMMIT\`
+
+          Verify (one command, no rebuild):
+          \`\`\`
+          docker buildx imagetools inspect $IMAGE:$TAG --format '{{.Manifest.Digest}}'
+          \`\`\`
+          The output should equal the digest above.
+          EOF
+          )
+          gh release edit "$TAG" --repo "$REPO" --notes-append "$NOTES"
+
   notify:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     needs: publish
     uses: ./.github/workflows/slack_release_notification.yml
-    secrets: 
+    secrets:
       RELEASES_SLACK_WEBHOOK_URL: ${{ secrets.RELEASES_SLACK_WEBHOOK_URL }}
     with:
       environment: Production
       service: Tokenbridge Oracle
       success: ${{ contains(join(needs.*.result, ','), 'success') }}
-      message: "Released new docker image of `Tokenbridge Oracle` version `${{ needs.publish.outputs.version }}`. Triggered by `${{ github.actor }}`. Docker image: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=`${{ needs.publish.outputs.version }}`."
+      message: "Released `Tokenbridge Oracle` version `${{ needs.publish.outputs.version }}` from commit `${{ needs.publish.outputs.commit }}`. Triggered by `${{ github.actor }}`. Image digest: `${{ needs.publish.outputs.digest }}`. Docker Hub: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=${{ needs.publish.outputs.version }}"
