@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# verify.sh — reproduce the verification documented in HOW_TO_VERIFY.md
+# verify.sh — reproduce the verification documented in oracle/HOW_TO_VERIFY.md
 # end-to-end on the host. No helper container is used: mounting the host
 # Docker socket into a container would give that container root-equivalent
 # control over the daemon, expanding the trust boundary to every layer of
@@ -12,8 +12,7 @@
 #   On non-amd64 hosts, the script registers binfmt automatically.
 #
 # Usage:
-#   ./verify.sh                       # verify the default tag (v3.11.0): https://hub.docker.com/layers/gnosischain/tokenbridge-oracle/v3.11.0/images/sha256-70ded02dbe3a0d047021fb673d351fca481b3591bdcb937a1c4b11d03bb32854
-#   ./verify.sh v3.12.0               # verify a different release tag
+#   ./verify.sh <TAG>                 # verify a published release tag against its source
 #
 # Optional environment variables:
 #   SOURCE_REPO            git remote URL          (default: gnosischain/tokenbridge)
@@ -22,19 +21,11 @@
 #                          resolvedDependencies    (default: pkg:docker/node)
 #   BASE_IMAGE_FROM_NAME   token to pin in the Dockerfile FROM line
 #                                                  (default: node:12)
-#   ALLOW_UNSIGNED_TAG     defaults to 1 because the v3.11.0 release tag is
-#                          unsigned (see HOW_TO_VERIFY.md, Appendix C, for
-#                          the limitation this introduces and the planned
-#                          fix). Set to 0 to enforce `git tag -v`; that
-#                          requires a future signed release plus the
-#                          maintainer's public key in your GPG keyring.
-#   COSIGN_KEY             path or URL to the maintainer's public key. When
-#                          set, the SLSA provenance attestation is verified
-#                          with `cosign verify-attestation` before the base-
-#                          image digest is trusted. When unset, the script
-#                          warns and continues — provenance authenticity is
-#                          NOT checked and a malicious registry could in
-#                          principle serve self-consistent fake provenance.
+#   ALLOW_UNSIGNED_TAG     defaults to 1 because release tags may be unsigned
+#                          (see oracle/HOW_TO_VERIFY.md, Appendix C, for the limitation
+#                          this introduces and the planned fix). Set to 0 to
+#                          enforce `git tag -v`; that requires a signed release
+#                          plus the maintainer's public key in your GPG keyring.
 #
 # Exit codes:
 #   0   verification passed
@@ -43,13 +34,17 @@
 
 set -euo pipefail
 
-TAG="${1:-v3.11.0}"
+TAG="${1:-}"
+if [[ -z "$TAG" ]]; then
+  echo "Usage: $0 <TAG>" >&2
+  echo "  Verify a published release tag against its source (see oracle/HOW_TO_VERIFY.md)." >&2
+  exit 2
+fi
 SOURCE_REPO="${SOURCE_REPO:-https://github.com/gnosischain/tokenbridge.git}"
 IMAGE_REPO="${IMAGE_REPO:-gnosischain/tokenbridge-oracle}"
 BASE_IMAGE_PKG="${BASE_IMAGE_PKG:-pkg:docker/node}"
 BASE_IMAGE_FROM_NAME="${BASE_IMAGE_FROM_NAME:-node:12}"
 ALLOW_UNSIGNED_TAG="${ALLOW_UNSIGNED_TAG:-1}"
-COSIGN_KEY="${COSIGN_KEY:-}"
 
 # --- Host preflight ----------------------------------------------------------
 
@@ -57,9 +52,6 @@ missing=()
 for tool in docker git jq tar sha256sum sed; do
   command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
 done
-if [[ -n "$COSIGN_KEY" ]] && ! command -v cosign >/dev/null 2>&1; then
-  missing+=("cosign")
-fi
 if (( ${#missing[@]} > 0 )); then
   echo "ERROR: missing required host tools: ${missing[*]}" >&2
   echo "       Install them and re-run." >&2
@@ -112,14 +104,14 @@ else
   if [[ "$ALLOW_UNSIGNED_TAG" == "1" ]]; then
     echo "WARNING: tag '$TAG' is unsigned. Continuing (ALLOW_UNSIGNED_TAG=1, the default)." >&2
     echo "         Without a signature, a force-pushed or retagged release on the" >&2
-    echo "         remote could deceive this verification. v3.11.0 is unsigned;" >&2
-    echo "         see HOW_TO_VERIFY.md Appendix C for the limitation and the" >&2
-    echo "         planned move to signed tags + cosign attestations." >&2
+    echo "         remote could deceive this verification. See oracle/HOW_TO_VERIFY.md" >&2
+    echo "         Appendix C for the limitation and the planned move to signed" >&2
+    echo "         tags + cosign attestations." >&2
   else
     echo "ERROR: tag '$TAG' is unsigned or its signature could not be verified." >&2
     echo "       Import the maintainer's public key (gpg --recv-keys ...) and re-run," >&2
     echo "       or set ALLOW_UNSIGNED_TAG=1 to accept the limitation documented in" >&2
-    echo "       HOW_TO_VERIFY.md Appendix C." >&2
+    echo "       oracle/HOW_TO_VERIFY.md Appendix C." >&2
     exit 2
   fi
 fi
@@ -162,24 +154,14 @@ FINISHED=$(echo "$PROV_JSON" | jq -r '.SLSA.runDetails.metadata.finishedOn // "u
 echo "CI build window: $STARTED -> $FINISHED"
 echo "Resolved base:   ${BASE_IMAGE_FROM_NAME}@sha256:$NODE_DIGEST"
 
-# --- Step 3b (optional): verify provenance signature with cosign -------------
+# --- Step 3b: provenance trust caveat ----------------------------------------
 
-if [[ -n "$COSIGN_KEY" ]]; then
-  echo
-  echo "=== Step 3b: verify SLSA provenance signature with cosign ==="
-  cosign verify-attestation \
-    --key "$COSIGN_KEY" \
-    --type slsaprovenance \
-    "$IMAGE_REPO:$TAG" >/dev/null
-  echo "Provenance attestation signature verified against $COSIGN_KEY."
-else
-  echo
-  echo "WARNING: COSIGN_KEY not set — the provenance read above is trusted from" >&2
-  echo "         the registry's word. A malicious registry could serve self-" >&2
-  echo "         consistent fake provenance pointing at a fake base image, and" >&2
-  echo "         the byte-for-byte rebuild check below would still pass against" >&2
-  echo "         that fake. Set COSIGN_KEY=<maintainer-pubkey> to close this gap." >&2
-fi
+echo
+echo "NOTE: the provenance read above is trusted as served by the registry; this" >&2
+echo "      procedure does not independently authenticate it. A malicious registry" >&2
+echo "      could serve self-consistent fake provenance pointing at a fake base" >&2
+echo "      image, and the rebuild below would still match against that fake. See" >&2
+echo "      oracle/HOW_TO_VERIFY.md Appendix C; signed provenance (Option 3) is the fix." >&2
 
 # --- Step 4: pin the FROM line in the cloned Dockerfile ----------------------
 
@@ -278,13 +260,11 @@ if diff -q "$WORKDIR/pub.hashes" "$WORKDIR/loc.hashes" >/dev/null; then
   echo "  Base image:    ${BASE_IMAGE_FROM_NAME}@sha256:$NODE_DIGEST"
   echo "  CI build:      $STARTED -> $FINISHED"
   echo
-  echo "  What this run did NOT verify (see HOW_TO_VERIFY.md Appendix C):"
+  echo "  What this run did NOT verify (see oracle/HOW_TO_VERIFY.md Appendix C):"
   if [[ "$ALLOW_UNSIGNED_TAG" == "1" ]]; then
-    echo "    - Tag signature: '$TAG' is unsigned (default for v3.11.0)."
+    echo "    - Tag signature: '$TAG' is unsigned."
   fi
-  if [[ -z "$COSIGN_KEY" ]]; then
-    echo "    - SLSA provenance signature: COSIGN_KEY not set."
-  fi
+  echo "    - SLSA provenance authenticity (read from the registry, not independently verified)."
   echo "    - That the CI runner producing the published image was uncompromised."
   echo "================================================================"
   RESULT=0
