@@ -9,7 +9,10 @@
 #
 # Host requirements:
 #   docker (with the buildx plugin), git, jq, tar, sha256sum, sed
-#   On non-amd64 hosts, the script registers binfmt automatically.
+#   On non-amd64 hosts (e.g. Apple Silicon), the Docker daemon must be able to
+#   run linux/amd64 images via QEMU emulation. Docker Desktop enables this by
+#   default; the script checks for it and, if it is missing, it tells you the one
+#   command to register it rather than running a privileged container itself.
 #
 # Usage:
 #   ./verify.sh <TAG>                 # verify a published release tag against its source
@@ -68,12 +71,28 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-# Apple Silicon / arm hosts need binfmt registered so the host daemon can
-# run linux/amd64 builds under QEMU. Idempotent — no-op if already set up.
+# This script builds and runs linux/amd64 images. On a non-amd64 host (e.g.
+# Apple Silicon) that needs the Docker daemon to emulate amd64 via QEMU binfmt.
+# Docker Desktop registers this by default; minimal Engine / colima / Rancher /
+# arm CI setups may not have it. We don't register it ourselves — that needs a
+# privileged container, which would widen this verification's trust boundary,
+# against the whole point of running on the host (see header). Instead we probe
+# for it and, if it is missing, point the user at their Docker Desktop settings
+# and stop.
 HOST_ARCH="$(uname -m)"
 if [[ "$HOST_ARCH" != "x86_64" && "$HOST_ARCH" != "amd64" ]]; then
-  echo "Host architecture is $HOST_ARCH — registering binfmt for linux/amd64 emulation..."
-  docker run --privileged --rm tonistiigi/binfmt --install amd64 >/dev/null
+  echo "Host architecture is $HOST_ARCH — checking linux/amd64 emulation..."
+  if ! docker run --rm --platform linux/amd64 hello-world >/dev/null 2>&1; then
+    echo "ERROR: this $HOST_ARCH host cannot run linux/amd64 images." >&2
+    echo "       This script builds and compares a linux/amd64 image, which needs" >&2
+    echo "       QEMU amd64 emulation registered with the Docker daemon." >&2
+    echo >&2
+    echo "       Docker Desktop enables this by default — if you use it, ensure" >&2
+    echo "       'Use Rosetta for x86_64/amd64 emulation' (or QEMU) is on under" >&2
+    echo "       Settings > General, restart the daemon, and re-run this script." >&2
+    exit 2
+  fi
+  echo "linux/amd64 emulation OK."
 fi
 
 WORKDIR="$(mktemp -d -t tokenbridge-verify-XXXXXX)"
@@ -163,38 +182,67 @@ echo "      could serve self-consistent fake provenance pointing at a fake base"
 echo "      image, and the rebuild below would still match against that fake. See" >&2
 echo "      oracle/HOW_TO_VERIFY.md Appendix C; signed provenance (Option 3) is the fix." >&2
 
-# --- Step 4: pin the FROM line in the cloned Dockerfile ----------------------
+# --- Step 4: confirm (or pin) the base image in the cloned Dockerfile --------
 
 echo
-echo "=== Step 4: pin '$BASE_IMAGE_FROM_NAME' in oracle/Dockerfile ==="
+echo "=== Step 4: confirm (or pin) '$BASE_IMAGE_FROM_NAME' in oracle/Dockerfile ==="
 DF="$WORKDIR/src/oracle/Dockerfile"
 
-# Flexible regex: matches 'FROM node:12', 'FROM node:12 AS builder', and
-# preserves whatever follows. Does NOT match fully-qualified forms
-# (docker.io/library/node:12) or ARG-driven versions — those would require
-# manual review anyway. Two passes avoid putting '$' inside an alternation
-# group, which BSD sed (macOS) does not handle. Pass 1 catches the
-# 'followed by whitespace' case; pass 2 catches the 'end of line' case.
-# After pass 1 matches, the line no longer ends in '${BASE_IMAGE_FROM_NAME}',
-# so pass 2 is a no-op — the two passes don't double-pin.
-sed -i.bak -E \
-  -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}([[:space:]])|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}\1|" \
-  -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}\$|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}|" \
-  "$DF"
-rm -f "${DF}.bak"
-
-# Hard-fail if the pin didn't actually land — silent no-op would leave the
-# build pulling the floating tag and only fail loudly at Step 8, by which
-# point ~10 min of build time has been wasted.
-if ! grep -q "@sha256:${NODE_DIGEST}" "$DF"; then
-  echo "ERROR: failed to pin '$BASE_IMAGE_FROM_NAME' in $DF." >&2
-  echo "       The FROM line may have changed shape upstream (fully-qualified" >&2
-  echo "       name, multi-stage alias variant, ARG-driven version). Inspect the" >&2
-  echo "       Dockerfile and pin manually, or adjust BASE_IMAGE_FROM_NAME." >&2
-  exit 2
+# oracle/Dockerfile now pins the base by digest (FROM node:12@sha256:...). Two
+# cases:
+#   - Current tags: the Dockerfile is already pinned. We only *confirm* that pin
+#     equals the digest CI recorded in the provenance (Step 3); if they disagree
+#     the published image was built from a different base than the committed
+#     Dockerfile claims, which is a finding, not a no-op.
+#   - Older tags cut before the pin landed: the FROM line is the floating
+#     'node:12', and we pin it locally so the rebuild can't drift onto a newer
+#     node:12 snapshot. The edit lives only in the throwaway clone.
+EXISTING_PIN=""
+if pin_line=$(grep -oE "^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}@sha256:[0-9a-f]{64}" "$DF" | head -1); then
+  EXISTING_PIN="${pin_line##*@}"   # -> sha256:<hex>
 fi
 
-git -C "$WORKDIR/src" --no-pager diff oracle/Dockerfile
+if [[ -n "$EXISTING_PIN" ]]; then
+  # Already pinned — confirm it matches the provenance digest from Step 3.
+  if [[ "$EXISTING_PIN" == "sha256:${NODE_DIGEST}" ]]; then
+    echo "Dockerfile already pins ${BASE_IMAGE_FROM_NAME}@${EXISTING_PIN} — matches provenance. No edit needed."
+  else
+    echo "ERROR: base-image mismatch between the Dockerfile and the provenance." >&2
+    echo "       oracle/Dockerfile pins:  ${BASE_IMAGE_FROM_NAME}@${EXISTING_PIN}" >&2
+    echo "       provenance (Step 3) has: ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}" >&2
+    echo "       The published image was built from a different base than the" >&2
+    echo "       committed Dockerfile claims. Stop and investigate before trusting it." >&2
+    exit 2
+  fi
+else
+  # Floating 'FROM node:12' (older tag) — pin it locally.
+  # Flexible regex: matches 'FROM node:12', 'FROM node:12 AS builder', and
+  # preserves whatever follows. Does NOT match fully-qualified forms
+  # (docker.io/library/node:12) or ARG-driven versions — those would require
+  # manual review anyway. Two passes avoid putting '$' inside an alternation
+  # group, which BSD sed (macOS) does not handle. Pass 1 catches the
+  # 'followed by whitespace' case; pass 2 catches the 'end of line' case.
+  # After pass 1 matches, the line no longer ends in '${BASE_IMAGE_FROM_NAME}',
+  # so pass 2 is a no-op — the two passes don't double-pin.
+  sed -i.bak -E \
+    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}([[:space:]])|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}\1|" \
+    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}\$|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}|" \
+    "$DF"
+  rm -f "${DF}.bak"
+
+  # Hard-fail if the pin didn't actually land — a silent no-op would leave the
+  # build pulling the floating tag and only fail loudly at Step 8, by which
+  # point ~10 min of build time has been wasted.
+  if ! grep -q "@sha256:${NODE_DIGEST}" "$DF"; then
+    echo "ERROR: failed to pin '$BASE_IMAGE_FROM_NAME' in $DF." >&2
+    echo "       The FROM line may have changed shape upstream (fully-qualified" >&2
+    echo "       name, multi-stage alias variant, ARG-driven version). Inspect the" >&2
+    echo "       Dockerfile and pin manually, or adjust BASE_IMAGE_FROM_NAME." >&2
+    exit 2
+  fi
+
+  git -C "$WORKDIR/src" --no-pager diff oracle/Dockerfile
+fi
 
 # --- Step 5: build locally with CI's flags -----------------------------------
 

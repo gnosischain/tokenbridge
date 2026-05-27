@@ -18,6 +18,41 @@ nothing is hardcoded. Substitute your own release tag wherever you see `$TAG`.
 
 ---
 
+## Quick start — check the published digest against the GitHub Release
+
+The fastest check (a few seconds, no build): confirm the image the registry serves for a tag is
+the exact one CI recorded in that tag's GitHub Release.
+
+```bash
+IMAGE=gnosischain/tokenbridge-oracle
+TAG=vX.Y.Z                          # the release you want to check
+
+# 1. The digest CI recorded at publish time, read from the release's "Published image" block:
+RECORDED_DIGEST=$(gh release view "$TAG" --repo gnosischain/tokenbridge --json body \
+  --jq '.body' | grep -oE 'sha256:[0-9a-f]{64}' | head -1)
+
+# 2. The digest the registry serves right now:
+LIVE_DIGEST=$(docker buildx imagetools inspect "$IMAGE:$TAG" --format '{{.Manifest.Digest}}')
+
+# 3. Compare:
+[ "$LIVE_DIGEST" = "$RECORDED_DIGEST" ] && echo match || echo MISMATCH
+```
+
+`match` → the image served at `$TAG` is the one CI recorded; you are done. `MISMATCH` → the tag
+has been re-pointed to a different image since release — **stop and investigate before deploying.**
+
+No `gh`? Open the release page on GitHub and copy the `digest:` line under **Published image**,
+then run step 2 and compare the two values by eye.
+
+**What this does and does not prove.** It detects a tag being re-pointed after release. It does
+*not* rebuild from source, so it cannot catch a compromised CI runner or prove the image's
+contents match this repo. For that stronger guarantee — plus the Docker-free fallback, the trust
+trade-offs, and the full field-by-field detail — see
+[Verify index digest (lightweight mode)](#verify-index-digest-lightweight-mode) and the full
+[Step-by-step reproduction](#step-by-step-reproduction) below.
+
+---
+
 ## Conventions
 
 Set these once in your shell; the rest of the procedure refers to them:
@@ -340,13 +375,11 @@ Debian Stretch is past EOL; the archive moved to `archive.debian.org`. The Docke
 points at the archive, so this should work — but transient network errors happen. Re-run Step 5.
 
 **The build fails at `yarn install`.**
-You're likely on a non-amd64 host without QEMU set up. Run:
-
-```bash
-docker run --privileged --rm tonistiigi/binfmt --install all
-```
-
-then re-run Step 5.
+You're likely on a non-amd64 host (e.g. Apple Silicon) whose Docker daemon can't emulate
+`linux/amd64`. Docker Desktop enables this by default — ensure **Settings → General → "Use
+Rosetta for x86_64/amd64 emulation"** (or QEMU) is on and restart the daemon, then re-run Step 5.
+(`verify.sh` probes for this and stops with the same guidance rather than registering emulation
+itself, which would require a privileged container.)
 
 **Differences appear inside `/mono/node_modules`.**
 Most likely cause: you skipped Step 4 and built against the floating `node:12` tag, which has
@@ -354,8 +387,9 @@ changed since the release. Re-do Step 3 and Step 4 with the digest from the publ
 
 **Differences appear inside `/mono/oracle` or `/mono/commons`.**
 The worktree was checked out at the wrong commit, or local changes leaked in. Run
-`git -C "$WORKTREE" status` — only the `oracle/Dockerfile` edit from Step 4 should appear. If
-anything else is modified, blow away the worktree and start again at Step 2.
+`git -C "$WORKTREE" status` — it should be clean for a current (already-pinned) tag, or show
+only the `oracle/Dockerfile` pin edit if you pinned a floating `FROM node:12` for an older tag
+in Step 4. If anything else is modified, blow away the worktree and start again at Step 2.
 
 **Image IDs or manifest digests don't match the local rebuild.**
 Expected. They never will without reproducible-build tooling (`SOURCE_DATE_EPOCH`, pinned apt
