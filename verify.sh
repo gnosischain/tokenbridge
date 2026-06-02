@@ -69,8 +69,7 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-# Need linux/amd64 emulation on non-amd64 hosts. We probe rather than register
-# it (registering needs a privileged container, widening the trust boundary).
+# Need linux/amd64 emulation on non-amd64 hosts.
 HOST_ARCH="$(uname -m)"
 if [[ "$HOST_ARCH" != "x86_64" && "$HOST_ARCH" != "amd64" ]]; then
   echo "Host architecture is $HOST_ARCH — checking linux/amd64 emulation..."
@@ -123,15 +122,25 @@ echo "Tag resolves to expected commit ($EXPECTED_SOURCE_COMMIT)."
 
 echo
 echo "=== Step 2: resolve base-image digest from published SLSA provenance ==="
-PROV_JSON=$(docker buildx imagetools inspect \
-  --format '{{json .Provenance}}' \
+# Extract only the needed fields, not the whole document: the full provenance
+# embeds the git commit message, which BuildKit sometimes emits with a raw
+# newline (invalid JSON that jq >= 1.7 rejects). The base lives under
+# buildDefinition.resolvedDependencies in SLSA v1.0 and materials in v0.2; try
+# v1.0, fall back to v0.2 (an absent path yields the literal null).
+DEPS=$(docker buildx imagetools inspect \
+  --format '{{json .Provenance.SLSA.buildDefinition.resolvedDependencies}}' \
   "$IMAGE_REPO:$TAG")
+if [[ "$DEPS" == "null" || -z "$DEPS" ]]; then
+  DEPS=$(docker buildx imagetools inspect \
+    --format '{{json .Provenance.SLSA.materials}}' \
+    "$IMAGE_REPO:$TAG")
+fi
 
-# Filter resolvedDependencies by purl prefix rather than trusting index [0].
-# BuildKit does not guarantee dependency ordering across versions.
-NODE_DIGESTS=$(echo "$PROV_JSON" \
+# Filter the base image by purl prefix rather than trusting index [0]; BuildKit
+# does not guarantee dependency ordering.
+NODE_DIGESTS=$(echo "$DEPS" \
   | jq -r --arg pkg "$BASE_IMAGE_PKG" '
-      .SLSA.buildDefinition.resolvedDependencies[]?
+      .[]?
       | select(.uri | startswith($pkg))
       | .digest.sha256
     ')
@@ -152,10 +161,45 @@ if (( MATCH_COUNT > 1 )); then
 fi
 
 NODE_DIGEST="$NODE_DIGESTS"
-STARTED=$(echo "$PROV_JSON" | jq -r '.SLSA.runDetails.metadata.startedOn // "unknown"')
-FINISHED=$(echo "$PROV_JSON" | jq -r '.SLSA.runDetails.metadata.finishedOn // "unknown"')
+
+# Build metadata: timestamps and the VCS revision the image claims, with the
+# same v1.0/v0.2 path split as above.
+META=$(docker buildx imagetools inspect \
+  --format '{{json .Provenance.SLSA.runDetails.metadata}}' \
+  "$IMAGE_REPO:$TAG")
+if [[ "$META" == "null" || -z "$META" ]]; then
+  META=$(docker buildx imagetools inspect \
+    --format '{{json .Provenance.SLSA.metadata}}' \
+    "$IMAGE_REPO:$TAG")
+fi
+STARTED=$(echo "$META" | jq -r '.startedOn // .buildStartedOn // "unknown"')
+FINISHED=$(echo "$META" | jq -r '.finishedOn // .buildFinishedOn // "unknown"')
 echo "CI build window: $STARTED -> $FINISHED"
 echo "Resolved base:   ${BASE_IMAGE_FROM_NAME}@sha256:$NODE_DIGEST"
+
+# Cross-check the commit the image claims against EXPECTED_SOURCE_COMMIT — an
+# early-warning signal only, since the authoritative source->image proof is the
+# rebuild in Steps 3-8. Revision is under buildkit_metadata.vcs in v1.0, under
+# the 'https://mobyproject.org/buildkit@v1#metadata' key in v0.2.
+PROV_REVISION=$(echo "$META" | jq -r '
+  .buildkit_metadata.vcs.revision
+  // ."https://mobyproject.org/buildkit@v1#metadata".vcs.revision
+  // "unknown"')
+if [[ "$PROV_REVISION" == "unknown" ]]; then
+  echo "WARNING: provenance records no VCS revision; skipping image-claimed-commit cross-check." >&2
+else
+  # 'exp' is the lowercased EXPECTED_SOURCE_COMMIT from Step 1; prefix match accepts a short SHA.
+  prov_got=$(echo "$PROV_REVISION" | tr '[:upper:]' '[:lower:]')
+  if [[ "$prov_got" != "$exp"* ]]; then
+    echo "ERROR: the published image's provenance claims a different source commit than expected." >&2
+    echo "       expected (EXPECTED_SOURCE_COMMIT): $EXPECTED_SOURCE_COMMIT" >&2
+    echo "       provenance VCS revision:           $PROV_REVISION" >&2
+    echo "       The image was built from a different commit than the one you trust." >&2
+    echo "       Stop and investigate before trusting it." >&2
+    exit 2
+  fi
+  echo "Provenance VCS revision matches expected commit ($PROV_REVISION)."
+fi
 
 # --- Step 2b: provenance trust caveat ----------------------------------------
 
