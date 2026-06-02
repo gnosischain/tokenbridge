@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 #
-# verify.sh — reproduce the verification documented in oracle/HOW_TO_VERIFY.md
-# end-to-end on the host. No helper container is used: mounting the host
-# Docker socket into a container would give that container root-equivalent
-# control over the daemon, expanding the trust boundary to every layer of
-# its build (Ubuntu image, apt mirrors, Docker's apt repo, this script's
-# cloned source). Running on the host keeps the trust boundary tight.
+# verify.sh — automates the "Full check" in oracle/VERIFICATION_DETAILS.md:
+# rebuild the image from source and diff it, file-by-file, against what is
+# published. Runs on the host by design (no helper container) to keep the
+# trust boundary tight. See VERIFICATION_DETAILS.md for rationale and limits.
 #
-# Host requirements:
-#   docker (with the buildx plugin), git, jq, tar, sha256sum, sed
-#   On non-amd64 hosts (e.g. Apple Silicon), the Docker daemon must be able to
-#   run linux/amd64 images via QEMU emulation. Docker Desktop enables this by
-#   default; the script checks for it and, if it is missing, it tells you the one
-#   command to register it rather than running a privileged container itself.
+# Host requirements: docker (+buildx), git, jq, tar, sha256sum, sed.
+# Non-amd64 hosts need linux/amd64 emulation (Docker Desktop enables it); the
+# script probes for it and stops with guidance if missing.
 #
 # Usage:
-#   ./verify.sh <TAG>                 # verify a published release tag against its source
+#   ./verify.sh <TAG> <EXPECTED_SOURCE_COMMIT>
+#     <TAG>                    published release tag to verify against its source
+#     <EXPECTED_SOURCE_COMMIT> commit SHA the tag MUST resolve to, obtained
+#                            out-of-band. Required: without it a tag re-pointed to a
+#                            matching malicious image would still pass — the rebuild
+#                            only proves image-matches-its-source, not that the source
+#                            is the one you trust. Accepts a full or abbreviated SHA.
 #
 # Optional environment variables:
 #   SOURCE_REPO            git remote URL          (default: gnosischain/tokenbridge)
@@ -24,11 +25,6 @@
 #                          resolvedDependencies    (default: pkg:docker/node)
 #   BASE_IMAGE_FROM_NAME   token to pin in the Dockerfile FROM line
 #                                                  (default: node:12)
-#   ALLOW_UNSIGNED_TAG     defaults to 1 because release tags may be unsigned
-#                          (see oracle/HOW_TO_VERIFY.md, Appendix C, for the limitation
-#                          this introduces and the planned fix). Set to 0 to
-#                          enforce `git tag -v`; that requires a signed release
-#                          plus the maintainer's public key in your GPG keyring.
 #
 # Exit codes:
 #   0   verification passed
@@ -38,16 +34,18 @@
 set -euo pipefail
 
 TAG="${1:-}"
-if [[ -z "$TAG" ]]; then
-  echo "Usage: $0 <TAG>" >&2
-  echo "  Verify a published release tag against its source (see oracle/HOW_TO_VERIFY.md)." >&2
+EXPECTED_SOURCE_COMMIT="${2:-}"
+if [[ -z "$TAG" || -z "$EXPECTED_SOURCE_COMMIT" ]]; then
+  echo "Usage: $0 <TAG> <EXPECTED_SOURCE_COMMIT>" >&2
+  echo "  EXPECTED_SOURCE_COMMIT is required: without it a tag re-pointed to a matching" >&2
+  echo "  malicious image would still pass. Obtain the commit out-of-band." >&2
+  echo "  See oracle/VERIFICATION_DETAILS.md." >&2
   exit 2
 fi
 SOURCE_REPO="${SOURCE_REPO:-https://github.com/gnosischain/tokenbridge.git}"
 IMAGE_REPO="${IMAGE_REPO:-gnosischain/tokenbridge-oracle}"
 BASE_IMAGE_PKG="${BASE_IMAGE_PKG:-pkg:docker/node}"
 BASE_IMAGE_FROM_NAME="${BASE_IMAGE_FROM_NAME:-node:12}"
-ALLOW_UNSIGNED_TAG="${ALLOW_UNSIGNED_TAG:-1}"
 
 # --- Host preflight ----------------------------------------------------------
 
@@ -71,14 +69,8 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-# This script builds and runs linux/amd64 images. On a non-amd64 host (e.g.
-# Apple Silicon) that needs the Docker daemon to emulate amd64 via QEMU binfmt.
-# Docker Desktop registers this by default; minimal Engine / colima / Rancher /
-# arm CI setups may not have it. We don't register it ourselves — that needs a
-# privileged container, which would widen this verification's trust boundary,
-# against the whole point of running on the host (see header). Instead we probe
-# for it and, if it is missing, point the user at their Docker Desktop settings
-# and stop.
+# Need linux/amd64 emulation on non-amd64 hosts. We probe rather than register
+# it (registering needs a privileged container, widening the trust boundary).
 HOST_ARCH="$(uname -m)"
 if [[ "$HOST_ARCH" != "x86_64" && "$HOST_ARCH" != "amd64" ]]; then
   echo "Host architecture is $HOST_ARCH — checking linux/amd64 emulation..."
@@ -113,32 +105,24 @@ git clone --quiet --depth=1 --branch "$TAG" "$SOURCE_REPO" "$WORKDIR/src"
 SOURCE_COMMIT=$(git -C "$WORKDIR/src" rev-parse HEAD)
 echo "Cloned commit: $SOURCE_COMMIT"
 
-# --- Step 2: verify the release tag is signed --------------------------------
-
-echo
-echo "=== Step 2: verify GPG signature on tag $TAG ==="
-if git -C "$WORKDIR/src" tag -v "$TAG" 2>&1; then
-  echo "Tag signature verified."
-else
-  if [[ "$ALLOW_UNSIGNED_TAG" == "1" ]]; then
-    echo "WARNING: tag '$TAG' is unsigned. Continuing (ALLOW_UNSIGNED_TAG=1, the default)." >&2
-    echo "         Without a signature, a force-pushed or retagged release on the" >&2
-    echo "         remote could deceive this verification. See oracle/HOW_TO_VERIFY.md" >&2
-    echo "         Appendix C for the limitation and the planned move to signed" >&2
-    echo "         tags + cosign attestations." >&2
-  else
-    echo "ERROR: tag '$TAG' is unsigned or its signature could not be verified." >&2
-    echo "       Import the maintainer's public key (gpg --recv-keys ...) and re-run," >&2
-    echo "       or set ALLOW_UNSIGNED_TAG=1 to accept the limitation documented in" >&2
-    echo "       oracle/HOW_TO_VERIFY.md Appendix C." >&2
-    exit 2
-  fi
+# Pin the subject: a tag is mutable on the remote, so assert it resolves to the
+# commit supplied out-of-band — otherwise a moved tag + matching malicious image
+# would pass. Prefix match accepts a short SHA.
+exp=$(echo "$EXPECTED_SOURCE_COMMIT" | tr '[:upper:]' '[:lower:]')
+got=$(echo "$SOURCE_COMMIT" | tr '[:upper:]' '[:lower:]')
+if [[ "$got" != "$exp"* ]]; then
+  echo "ERROR: tag '$TAG' resolves to a different commit than expected." >&2
+  echo "       expected: $EXPECTED_SOURCE_COMMIT" >&2
+  echo "       resolved: $SOURCE_COMMIT" >&2
+  echo "       The tag may have been re-pointed on the remote. Stop and investigate." >&2
+  exit 2
 fi
+echo "Tag resolves to expected commit ($EXPECTED_SOURCE_COMMIT)."
 
-# --- Step 3: resolve base-image digest from SLSA provenance ------------------
+# --- Step 2: resolve base-image digest from SLSA provenance ------------------
 
 echo
-echo "=== Step 3: resolve base-image digest from published SLSA provenance ==="
+echo "=== Step 2: resolve base-image digest from published SLSA provenance ==="
 PROV_JSON=$(docker buildx imagetools inspect \
   --format '{{json .Provenance}}' \
   "$IMAGE_REPO:$TAG")
@@ -173,66 +157,49 @@ FINISHED=$(echo "$PROV_JSON" | jq -r '.SLSA.runDetails.metadata.finishedOn // "u
 echo "CI build window: $STARTED -> $FINISHED"
 echo "Resolved base:   ${BASE_IMAGE_FROM_NAME}@sha256:$NODE_DIGEST"
 
-# --- Step 3b: provenance trust caveat ----------------------------------------
+# --- Step 2b: provenance trust caveat ----------------------------------------
 
 echo
-echo "NOTE: the provenance read above is trusted as served by the registry; this" >&2
-echo "      procedure does not independently authenticate it. A malicious registry" >&2
-echo "      could serve self-consistent fake provenance pointing at a fake base" >&2
-echo "      image, and the rebuild below would still match against that fake. See" >&2
-echo "      oracle/HOW_TO_VERIFY.md Appendix C; signed provenance (Option 3) is the fix." >&2
+echo "NOTE: provenance is trusted as served by the registry, not independently" >&2
+echo "      authenticated. See VERIFICATION_DETAILS.md, Limitations (signed provenance)." >&2
 
-# --- Step 4: confirm (or pin) the base image in the cloned Dockerfile --------
+# --- Step 3: confirm (or pin) the base image in the cloned Dockerfile --------
 
 echo
-echo "=== Step 4: confirm (or pin) '$BASE_IMAGE_FROM_NAME' in oracle/Dockerfile ==="
+echo "=== Step 3: confirm (or pin) '$BASE_IMAGE_FROM_NAME' in oracle/Dockerfile ==="
 DF="$WORKDIR/src/oracle/Dockerfile"
 
-# oracle/Dockerfile now pins the base by digest (FROM node:12@sha256:...). Two
-# cases:
-#   - Current tags: the Dockerfile is already pinned. We only *confirm* that pin
-#     equals the digest CI recorded in the provenance (Step 3); if they disagree
-#     the published image was built from a different base than the committed
-#     Dockerfile claims, which is a finding, not a no-op.
-#   - Older tags cut before the pin landed: the FROM line is the floating
-#     'node:12', and we pin it locally so the rebuild can't drift onto a newer
-#     node:12 snapshot. The edit lives only in the throwaway clone.
+# oracle/Dockerfile pins the base by digest. Current tags: confirm the pin
+# equals the provenance digest (mismatch = finding). Older tags with a floating
+# 'FROM node:12': pin locally so the rebuild can't drift. See VERIFICATION_DETAILS.md.
 EXISTING_PIN=""
 if pin_line=$(grep -oE "^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}@sha256:[0-9a-f]{64}" "$DF" | head -1); then
   EXISTING_PIN="${pin_line##*@}"   # -> sha256:<hex>
 fi
 
 if [[ -n "$EXISTING_PIN" ]]; then
-  # Already pinned — confirm it matches the provenance digest from Step 3.
+  # Already pinned — confirm it matches the provenance digest from Step 2.
   if [[ "$EXISTING_PIN" == "sha256:${NODE_DIGEST}" ]]; then
     echo "Dockerfile already pins ${BASE_IMAGE_FROM_NAME}@${EXISTING_PIN} — matches provenance. No edit needed."
   else
     echo "ERROR: base-image mismatch between the Dockerfile and the provenance." >&2
     echo "       oracle/Dockerfile pins:  ${BASE_IMAGE_FROM_NAME}@${EXISTING_PIN}" >&2
-    echo "       provenance (Step 3) has: ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}" >&2
+    echo "       provenance (Step 2) has: ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}" >&2
     echo "       The published image was built from a different base than the" >&2
     echo "       committed Dockerfile claims. Stop and investigate before trusting it." >&2
     exit 2
   fi
 else
-  # Floating 'FROM node:12' (older tag) — pin it locally.
-  # Flexible regex: matches 'FROM node:12', 'FROM node:12 AS builder', and
-  # preserves whatever follows. Does NOT match fully-qualified forms
-  # (docker.io/library/node:12) or ARG-driven versions — those would require
-  # manual review anyway. Two passes avoid putting '$' inside an alternation
-  # group, which BSD sed (macOS) does not handle. Pass 1 catches the
-  # 'followed by whitespace' case; pass 2 catches the 'end of line' case.
-  # After pass 1 matches, the line no longer ends in '${BASE_IMAGE_FROM_NAME}',
-  # so pass 2 is a no-op — the two passes don't double-pin.
+  # Floating 'FROM node:12' (older tag): pin locally. Two passes (whitespace
+  # case, then EOL case) keep '$' out of an alternation, for BSD sed (macOS).
+  # Does not match fully-qualified or ARG-driven FROM lines — see hard-fail below.
   sed -i.bak -E \
     -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}([[:space:]])|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}\1|" \
     -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}\$|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}|" \
     "$DF"
   rm -f "${DF}.bak"
 
-  # Hard-fail if the pin didn't actually land — a silent no-op would leave the
-  # build pulling the floating tag and only fail loudly at Step 8, by which
-  # point ~10 min of build time has been wasted.
+  # Fail now if the pin didn't land, rather than after a ~10 min build.
   if ! grep -q "@sha256:${NODE_DIGEST}" "$DF"; then
     echo "ERROR: failed to pin '$BASE_IMAGE_FROM_NAME' in $DF." >&2
     echo "       The FROM line may have changed shape upstream (fully-qualified" >&2
@@ -244,10 +211,10 @@ else
   git -C "$WORKDIR/src" --no-pager diff oracle/Dockerfile
 fi
 
-# --- Step 5: build locally with CI's flags -----------------------------------
+# --- Step 4: build locally with CI's flags -----------------------------------
 
 echo
-echo "=== Step 5: build the image locally with CI's flags (~5-10 min) ==="
+echo "=== Step 4: build the image locally with CI's flags (~5-10 min) ==="
 docker buildx build \
   --platform linux/amd64 \
   --no-cache \
@@ -258,16 +225,16 @@ docker buildx build \
   -t "oracle:verify-$TAG" \
   "$WORKDIR/src"
 
-# --- Step 6: pull the published image ----------------------------------------
+# --- Step 5: pull the published image ----------------------------------------
 
 echo
-echo "=== Step 6: pull the published image ==="
+echo "=== Step 5: pull the published image ==="
 docker pull --platform linux/amd64 "$IMAGE_REPO:$TAG"
 
-# --- Step 7: export both filesystems -----------------------------------------
+# --- Step 6: export both filesystems -----------------------------------------
 
 echo
-echo "=== Step 7: export both filesystems ==="
+echo "=== Step 6: export both filesystems ==="
 mkdir -p "$WORKDIR/pub-fs" "$WORKDIR/loc-fs"
 
 PUB_CID=$(docker create "$IMAGE_REPO:$TAG")
@@ -278,10 +245,10 @@ LOC_CID=$(docker create "oracle:verify-$TAG")
 docker export "$LOC_CID" | tar -x -C "$WORKDIR/loc-fs"
 docker rm "$LOC_CID" >/dev/null
 
-# --- Step 8: hash every file under /mono and diff ----------------------------
+# --- Step 7: hash every file under /mono and diff ----------------------------
 
 echo
-echo "=== Step 8: hash every file under /mono in both filesystems ==="
+echo "=== Step 7: hash every file under /mono in both filesystems ==="
 for side in pub loc; do
   ( cd "$WORKDIR/${side}-fs/mono" \
     && find . -type f -print0 \
@@ -293,7 +260,7 @@ echo "Hashed pub: $(wc -l < "$WORKDIR/pub.hashes" | tr -d ' ') files"
 echo "Hashed loc: $(wc -l < "$WORKDIR/loc.hashes" | tr -d ' ') files"
 
 echo
-echo "=== Step 9: diff hash manifests ==="
+echo "=== Step 8: diff hash manifests ==="
 if diff -q "$WORKDIR/pub.hashes" "$WORKDIR/loc.hashes" >/dev/null; then
   COUNT=$(wc -l < "$WORKDIR/pub.hashes" | tr -d ' ')
   echo
@@ -308,10 +275,9 @@ if diff -q "$WORKDIR/pub.hashes" "$WORKDIR/loc.hashes" >/dev/null; then
   echo "  Base image:    ${BASE_IMAGE_FROM_NAME}@sha256:$NODE_DIGEST"
   echo "  CI build:      $STARTED -> $FINISHED"
   echo
-  echo "  What this run did NOT verify (see oracle/HOW_TO_VERIFY.md Appendix C):"
-  if [[ "$ALLOW_UNSIGNED_TAG" == "1" ]]; then
-    echo "    - Tag signature: '$TAG' is unsigned."
-  fi
+  echo "  What this run did NOT verify (see oracle/VERIFICATION_DETAILS.md, Limitations):"
+  echo "    - That EXPECTED_SOURCE_COMMIT is the commit you intend (the supplied value is"
+  echo "      trusted as-is; obtain it from a trusted, out-of-band source)."
   echo "    - SLSA provenance authenticity (read from the registry, not independently verified)."
   echo "    - That the CI runner producing the published image was uncompromised."
   echo "================================================================"
