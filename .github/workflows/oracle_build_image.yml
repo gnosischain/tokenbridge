@@ -11,19 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish:
+  # Step 1: Resolve the version tag. This must be its own job because the build
+  # job below calls a reusable workflow (`uses:`), and such jobs cannot also run
+  # `steps:`. The version is exposed as an output for the build & notify jobs.
+  version:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.get_tag.outputs.version }}
-      digest:  ${{ steps.build.outputs.digest }}
       commit:  ${{ github.event.workflow_run.head_sha }}
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       # Pointing to old repo of contracts: TODO add ABIS from tokenbridge-contracts
       # - name: Checkout
@@ -33,43 +33,63 @@ jobs:
       #     path: ./contracts
       #     ref: 908a48107919d4ab127f9af07d44d47eac91547e
 
-      # Step 2: Extract version tag
       - name: Get current version tag
         id: get_tag
         run: |
           git fetch --tags
-          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          latest_tag=$(git describe --tags "$(git rev-list --tags --max-count=1)")
           echo "version=$latest_tag" >> "$GITHUB_OUTPUT"
 
-      # Step 3: Login to Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v1
-        with:
+  # Step 2: Build & push the multi-arch image via Docker's official GitHub Builder
+  # reusable workflow. distribute:true (default) builds each platform on its own
+  # NATIVE runner (arm64 -> ubuntu-24.04-arm), replacing the slow QEMU emulation.
+  # Dropping the old no-cache:true in favour of the signed GHA cache is the single
+  # biggest speedup here. Also emits signed SLSA provenance + an SBOM.
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: version
+    permissions:
+      contents: read
+      id-token: write          # required for signed SLSA provenance attestation
+    uses: docker/github-builder/.github/workflows/build.yml@70ac3fc303efa83d2b94905e6ab78bb83cbdc2ae # v1.11.0
+    with:
+      output: image
+      push: true
+      platforms: linux/amd64,linux/arm64
+      file: ./oracle/Dockerfile
+      context: .
+      cache: true
+      cache-mode: max
+      sbom: true
+      set-meta-labels: true
+      meta-images: gnosischain/tokenbridge-oracle
+      meta-tags: |
+        type=raw,value=${{ needs.version.outputs.version }}
+        type=raw,value=latest
+    secrets:
+      registry-auths: |
+        - registry: docker.io
           username: ${{ secrets.DOCKERHUB_ACCESS_TOKEN_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN_SECRET }}
 
-      # Step 4: Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      # Step 5: Build and push Docker image
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./oracle/Dockerfile
-          push: true
-          no-cache: true
-          tags: gnosischain/tokenbridge-oracle:${{ steps.get_tag.outputs.version }},gnosischain/tokenbridge-oracle:latest
-
-      # Step 6: Record (commit -> digest) binding for lightweight verification
+  # Step 3: Record the (commit -> digest) binding for lightweight verification.
+  # Own job because `publish` calls a reusable workflow and cannot run `steps:`.
+  # The digest is the pushed multi-arch INDEX digest — the same value
+  # `docker buildx imagetools inspect --format '{{.Manifest.Digest}}'` returns.
+  record-binding:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write          # gh release edit
+    steps:
       - name: Record release binding
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG:    ${{ steps.get_tag.outputs.version }}
-          COMMIT: ${{ github.event.workflow_run.head_sha }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          TAG:    ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
           IMAGE:  gnosischain/tokenbridge-oracle
           REPO:   ${{ github.repository }}
         run: |
@@ -121,7 +141,7 @@ jobs:
 
   notify:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    needs: publish
+    needs: [version, publish]
     uses: ./.github/workflows/slack_release_notification.yml
     secrets:
       RELEASES_SLACK_WEBHOOK_URL: ${{ secrets.RELEASES_SLACK_WEBHOOK_URL }}
@@ -129,4 +149,4 @@ jobs:
       environment: Production
       service: Tokenbridge Oracle
       success: ${{ contains(join(needs.*.result, ','), 'success') }}
-      message: "Released `Tokenbridge Oracle` version `${{ needs.publish.outputs.version }}` from commit `${{ needs.publish.outputs.commit }}`. Triggered by `${{ github.actor }}`. Image digest: `${{ needs.publish.outputs.digest }}`. Docker Hub: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=${{ needs.publish.outputs.version }}"
+      message: "Released `Tokenbridge Oracle` version `${{ needs.version.outputs.version }}` from commit `${{ needs.version.outputs.commit }}`. Triggered by `${{ github.actor }}`. Image digest: `${{ needs.publish.outputs.digest }}`. Docker Hub: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=${{ needs.version.outputs.version }}"

@@ -124,17 +124,35 @@ echo
 echo "=== Step 2: resolve base-image digest from published SLSA provenance ==="
 # Extract only the needed fields, not the whole document: the full provenance
 # embeds the git commit message, which BuildKit sometimes emits with a raw
-# newline (invalid JSON that jq >= 1.7 rejects). The base lives under
-# buildDefinition.resolvedDependencies in SLSA v1.0 and materials in v0.2; try
-# v1.0, fall back to v0.2 (an absent path yields the literal null).
-DEPS=$(docker buildx imagetools inspect \
-  --format '{{json .Provenance.SLSA.buildDefinition.resolvedDependencies}}' \
-  "$IMAGE_REPO:$TAG")
-if [[ "$DEPS" == "null" || -z "$DEPS" ]]; then
-  DEPS=$(docker buildx imagetools inspect \
-    --format '{{json .Provenance.SLSA.materials}}' \
-    "$IMAGE_REPO:$TAG")
-fi
+# newline (invalid JSON that jq >= 1.7 rejects).
+#
+# The lookup path varies along two axes:
+#   - platform layout: single-platform images expose provenance at
+#     .Provenance.SLSA; multi-platform images key it by platform, so the
+#     linux/amd64 slice (the one rebuilt below) lives at
+#     (index .Provenance "linux/amd64").SLSA.
+#   - SLSA version: the base image is under buildDefinition.resolvedDependencies
+#     in v1.0 and materials in v0.2.
+# prov_field tries each format in order and returns the first non-null hit; a
+# format that doesn't apply makes imagetools exit non-zero or print null/empty,
+# both of which mean "try the next one".
+prov_field() {
+  local fmt out
+  for fmt in "$@"; do
+    if out=$(docker buildx imagetools inspect --format "$fmt" "$IMAGE_REPO:$TAG" 2>/dev/null) \
+      && [[ -n "$out" && "$out" != "null" ]]; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+  done
+  echo "null"
+}
+
+DEPS=$(prov_field \
+  '{{json (index .Provenance "linux/amd64").SLSA.buildDefinition.resolvedDependencies}}' \
+  '{{json (index .Provenance "linux/amd64").SLSA.materials}}' \
+  '{{json .Provenance.SLSA.buildDefinition.resolvedDependencies}}' \
+  '{{json .Provenance.SLSA.materials}}')
 
 # Filter the base image by purl prefix rather than trusting index [0]; BuildKit
 # does not guarantee dependency ordering.
@@ -163,15 +181,12 @@ fi
 NODE_DIGEST="$NODE_DIGESTS"
 
 # Build metadata: timestamps and the VCS revision the image claims, with the
-# same v1.0/v0.2 path split as above.
-META=$(docker buildx imagetools inspect \
-  --format '{{json .Provenance.SLSA.runDetails.metadata}}' \
-  "$IMAGE_REPO:$TAG")
-if [[ "$META" == "null" || -z "$META" ]]; then
-  META=$(docker buildx imagetools inspect \
-    --format '{{json .Provenance.SLSA.metadata}}' \
-    "$IMAGE_REPO:$TAG")
-fi
+# same platform-layout and v1.0/v0.2 path splits as above.
+META=$(prov_field \
+  '{{json (index .Provenance "linux/amd64").SLSA.runDetails.metadata}}' \
+  '{{json (index .Provenance "linux/amd64").SLSA.metadata}}' \
+  '{{json .Provenance.SLSA.runDetails.metadata}}' \
+  '{{json .Provenance.SLSA.metadata}}')
 STARTED=$(echo "$META" | jq -r '.startedOn // .buildStartedOn // "unknown"')
 FINISHED=$(echo "$META" | jq -r '.finishedOn // .buildFinishedOn // "unknown"')
 echo "CI build window: $STARTED -> $FINISHED"
