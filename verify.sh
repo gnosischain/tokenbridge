@@ -5,7 +5,7 @@
 # published. Runs on the host by design (no helper container) to keep the
 # trust boundary tight. See VERIFICATION_DETAILS.md for rationale and limits.
 #
-# Host requirements: docker (+buildx), git, jq, tar, sha256sum, sed.
+# Host requirements: docker (+buildx), git, jq, tar, sha256sum (or shasum), sed.
 # Non-amd64 hosts need linux/amd64 emulation (Docker Desktop enables it); the
 # script probes for it and stops with guidance if missing.
 #
@@ -16,7 +16,7 @@
 #                            out-of-band. Required: without it a tag re-pointed to a
 #                            matching malicious image would still pass — the rebuild
 #                            only proves image-matches-its-source, not that the source
-#                            is the one you trust. Accepts a full or abbreviated SHA.
+#                            is the one you trust. Must be the full 40-character hex SHA.
 #
 # Optional environment variables:
 #   SOURCE_REPO            git remote URL          (default: gnosischain/tokenbridge)
@@ -50,9 +50,18 @@ BASE_IMAGE_FROM_NAME="${BASE_IMAGE_FROM_NAME:-node:12}"
 # --- Host preflight ----------------------------------------------------------
 
 missing=()
-for tool in docker git jq tar sha256sum sed; do
+for tool in docker git jq tar sed; do
   command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
 done
+# SHA-256 CLI: GNU sha256sum, or shasum -a 256 (macOS). Both print "<hash>  <path>",
+# and both manifests are produced by the same tool, so the diff stays consistent.
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256_CMD=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+  SHA256_CMD=(shasum -a 256)
+else
+  missing+=("sha256sum (or shasum)")
+fi
 if (( ${#missing[@]} > 0 )); then
   echo "ERROR: missing required host tools: ${missing[*]}" >&2
   echo "       Install them and re-run." >&2
@@ -106,10 +115,15 @@ echo "Cloned commit: $SOURCE_COMMIT"
 
 # Pin the subject: a tag is mutable on the remote, so assert it resolves to the
 # commit supplied out-of-band — otherwise a moved tag + matching malicious image
-# would pass. Prefix match accepts a short SHA.
+# would pass. A full 40-char SHA is required: a short prefix weakens the pin.
 exp=$(echo "$EXPECTED_SOURCE_COMMIT" | tr '[:upper:]' '[:lower:]')
+if [[ ! "$exp" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "ERROR: EXPECTED_SOURCE_COMMIT must be a full 40-character hex commit SHA." >&2
+  echo "       got: $EXPECTED_SOURCE_COMMIT" >&2
+  exit 2
+fi
 got=$(echo "$SOURCE_COMMIT" | tr '[:upper:]' '[:lower:]')
-if [[ "$got" != "$exp"* ]]; then
+if [[ "$got" != "$exp" ]]; then
   echo "ERROR: tag '$TAG' resolves to a different commit than expected." >&2
   echo "       expected: $EXPECTED_SOURCE_COMMIT" >&2
   echo "       resolved: $SOURCE_COMMIT" >&2
@@ -203,9 +217,9 @@ PROV_REVISION=$(echo "$META" | jq -r '
 if [[ "$PROV_REVISION" == "unknown" ]]; then
   echo "WARNING: provenance records no VCS revision; skipping image-claimed-commit cross-check." >&2
 else
-  # 'exp' is the lowercased EXPECTED_SOURCE_COMMIT from Step 1; prefix match accepts a short SHA.
+  # 'exp' is the lowercased EXPECTED_SOURCE_COMMIT from Step 1, validated as a full 40-char SHA.
   prov_got=$(echo "$PROV_REVISION" | tr '[:upper:]' '[:lower:]')
-  if [[ "$prov_got" != "$exp"* ]]; then
+  if [[ "$prov_got" != "$exp" ]]; then
     echo "ERROR: the published image's provenance claims a different source commit than expected." >&2
     echo "       expected (EXPECTED_SOURCE_COMMIT): $EXPECTED_SOURCE_COMMIT" >&2
     echo "       provenance VCS revision:           $PROV_REVISION" >&2
@@ -311,7 +325,7 @@ echo "=== Step 7: hash every file under /mono in both filesystems ==="
 for side in pub loc; do
   ( cd "$WORKDIR/${side}-fs/mono" \
     && find . -type f -print0 \
-    | xargs -0 sha256sum \
+    | xargs -0 "${SHA256_CMD[@]}" \
     | sort -k2 \
     > "$WORKDIR/${side}.hashes" )
 done

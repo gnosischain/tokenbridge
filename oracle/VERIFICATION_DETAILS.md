@@ -92,8 +92,9 @@ Command and details: [`HOW_TO_VERIFY.md` §2](./HOW_TO_VERIFY.md). Verify agains
 
 **Trust:** the certificate identity is the _reusable_ workflow
 (`docker/github-builder/.github/workflows/build.yml@...`), which any repository could call —
-the binding to _this repo's_ build comes from the recorded digest, or cryptographically via
-`--certificate-github-workflow-repository gnosischain/tokenbridge`. The signature attests _who
+the binding to _this repo's_ build comes from the recorded digest, and cryptographically from
+the `--certificate-github-workflow-repository gnosischain/tokenbridge` pin already included in
+the §2 command. The signature attests _who
 built_ the image, not _what is in_ it (that is the full check), and says nothing about whether
 the CI runner itself was compromised. Tags v3.10.0 and older predate the signing pipeline and
 fail with "no matching signatures".

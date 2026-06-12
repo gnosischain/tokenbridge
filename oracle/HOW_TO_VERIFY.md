@@ -35,12 +35,14 @@ Verify against the digest, not the tag (tags are mutable):
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github.com/docker/github-builder/.github/workflows/build.yml.*$' \
+  --certificate-github-workflow-repository gnosischain/tokenbridge \
   gnosischain/tokenbridge-oracle@sha256:<RECORDED_DIGEST>
 ```
 
 Success prints the verified claims and the signing certificate's identity.
-To also pin the calling repository cryptographically, add
-`--certificate-github-workflow-repository gnosischain/tokenbridge`.
+The `--certificate-github-workflow-repository` flag pins the calling repository:
+without it, an image built by any repo invoking the same reusable workflow would
+also pass.
 
 Note: only releases built by the multi-arch pipeline are signed; older tags (v3.10.0 or less)
 fail with "no matching signatures".
@@ -54,7 +56,8 @@ fail with "no matching signatures".
 
 - `VERIFIER_SHA` — commit SHA of the audited `verify.sh` to run (the tool).
 - `VERSION` — release tag to check, e.g. `v3.11.0` (the subject).
-- `EXPECTED_SOURCE_COMMIT` — commit SHA `VERSION` must resolve to.
+- `EXPECTED_SOURCE_COMMIT` — full 40-character commit SHA `VERSION` must resolve
+  to (abbreviated SHAs are rejected).
 
 ### Prerequisites
 
@@ -68,7 +71,7 @@ fail with "no matching signatures".
 
    ```bash
    curl -fsSL \
-     https://raw.githubusercontent.com/gnosischain/tokenbridge/<VERIFIER_SCRIPT_SHA>/oracle/verify.sh \
+     https://raw.githubusercontent.com/gnosischain/tokenbridge/<VERIFIER_SHA>/verify.sh \
      -o verify.sh
    ```
 
@@ -80,4 +83,7 @@ fail with "no matching signatures".
 ### Result
 
 - `✅ VERIFICATION PASSED` → image at `<VERSION>` was built from `<EXPECTED_SOURCE_COMMIT>`; files under `/mono` are byte-identical.
-- `❌ VERIFICATION FAILED` → differences under `/mono`, or tag does not resolve to `<EXPECTED_SOURCE_COMMIT>`. Do not deploy; investigate.
+- `❌ VERIFICATION FAILED` (exit 1) → differences under `/mono`. Do not deploy; investigate.
+- `ERROR: ...` (exit 2) → a preflight or supply-chain check failed before the build —
+  e.g. the tag does not resolve to `<EXPECTED_SOURCE_COMMIT>`, or the Dockerfile's
+  base pin contradicts the provenance. Stop and investigate.

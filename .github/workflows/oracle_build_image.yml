@@ -2,7 +2,7 @@ name: Publish Oracle Docker Image From Release
 
 on:
   workflow_run:
-    workflows: ["Create Github Release"]
+    workflows: ['Create Github Release']
     types:
       - completed
 
@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.get_tag.outputs.version }}
-      commit:  ${{ github.event.workflow_run.head_sha }}
+      commit: ${{ github.event.workflow_run.head_sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -50,7 +50,7 @@ jobs:
     needs: version
     permissions:
       contents: read
-      id-token: write          # required for signed SLSA provenance attestation
+      id-token: write # required for signed SLSA provenance attestation
     uses: docker/github-builder/.github/workflows/build.yml@70ac3fc303efa83d2b94905e6ab78bb83cbdc2ae # v1.11.0
     with:
       output: image
@@ -82,16 +82,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write          # gh release edit
+      contents: write # gh release edit
     steps:
       - name: Record release binding
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG:    ${{ needs.version.outputs.version }}
+          TAG: ${{ needs.version.outputs.version }}
           COMMIT: ${{ needs.version.outputs.commit }}
           DIGEST: ${{ needs.publish.outputs.digest }}
-          IMAGE:  gnosischain/tokenbridge-oracle
-          REPO:   ${{ github.repository }}
+          IMAGE: gnosischain/tokenbridge-oracle
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -130,14 +130,15 @@ jobs:
           - digest: \`$DIGEST\`
           - commit: \`$COMMIT\`
 
-          Verify (one command, no rebuild):
+          Verify:
           \`\`\`
           docker buildx imagetools inspect $IMAGE:$TAG --format '{{.Manifest.Digest}}'
           \`\`\`
           The output should equal the digest above.
           EOF
           )
-          gh release edit "$TAG" --repo "$REPO" --notes-append "$NOTES"
+          EXISTING=$(gh release view "$TAG" --repo "$REPO" --json body --jq .body)
+          printf '%s\n%s\n' "$EXISTING" "$NOTES" | gh release edit "$TAG" --repo "$REPO" --notes-file -
 
   notify:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -149,4 +150,4 @@ jobs:
       environment: Production
       service: Tokenbridge Oracle
       success: ${{ contains(join(needs.*.result, ','), 'success') }}
-      message: "Released `Tokenbridge Oracle` version `${{ needs.version.outputs.version }}` from commit `${{ needs.version.outputs.commit }}`. Triggered by `${{ github.actor }}`. Image digest: `${{ needs.publish.outputs.digest }}`. Docker Hub: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=${{ needs.version.outputs.version }}"
+      message: 'Released `Tokenbridge Oracle` version `${{ needs.version.outputs.version }}` from commit `${{ needs.version.outputs.commit }}`. Triggered by `${{ github.actor }}`. Image digest: `${{ needs.publish.outputs.digest }}`. Docker Hub: https://hub.docker.com/r/gnosischain/tokenbridge-oracle/tags?name=${{ needs.version.outputs.version }}'
