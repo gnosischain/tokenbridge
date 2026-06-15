@@ -1,9 +1,8 @@
 # How to Verify a Published Oracle Image
 
-Three checks, in increasing effort. Run checks 1 **and** 2 on every release —
-each takes seconds and they prove different things. Run check 3 when you want
-to trust nothing but the source. For the full reasoning, see
-[`VERIFICATION_DETAILS.md`](./VERIFICATION_DETAILS.md).
+Two checks, in increasing effort. Run check 1 on every release — it takes
+seconds. Run check 2 when you want to trust nothing but the source. For the
+full reasoning, see [`VERIFICATION_DETAILS.md`](./VERIFICATION_DETAILS.md).
 
 ## 1. Digest check
 
@@ -22,32 +21,7 @@ docker buildx imagetools inspect gnosischain/tokenbridge-oracle:<VERSION> \
 Output equals `RECORDED_DIGEST` → pass. Mismatch → the tag was re-pointed;
 **stop and investigate.**
 
-## 2. Signature check with cosign (run this too)
-
-> Checks that the image was built and signed by Docker's `github-builder`
-> workflow on GitHub Actions — anchored in the public Sigstore transparency
-> log — so a forged Release body or a compromised registry cannot fool you.
-
-Requires [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/).
-Verify against the digest, not the tag (tags are mutable):
-
-```bash
-cosign verify \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/docker/github-builder/.github/workflows/build.yml.*$' \
-  --certificate-github-workflow-repository gnosischain/tokenbridge \
-  gnosischain/tokenbridge-oracle@sha256:<RECORDED_DIGEST>
-```
-
-Success prints the verified claims and the signing certificate's identity.
-The `--certificate-github-workflow-repository` flag pins the calling repository:
-without it, an image built by any repo invoking the same reusable workflow would
-also pass.
-
-Note: only releases built by the multi-arch pipeline are signed; older tags (v3.10.0 or less)
-fail with "no matching signatures".
-
-## 3. Full audit: rebuild from source (optional, ~10 min)
+## 2. Full audit: rebuild from source (optional, ~10 min)
 
 > Checks that the published image's contents are byte-identical to what the
 > source at the release commit builds — without trusting CI at all.

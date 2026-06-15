@@ -234,7 +234,7 @@ fi
 
 echo
 echo "NOTE: provenance is trusted as served by the registry, not independently" >&2
-echo "      authenticated. See VERIFICATION_DETAILS.md, Limitations (signed provenance)." >&2
+echo "      authenticated. See VERIFICATION_DETAILS.md, Limitations." >&2
 
 # --- Step 3: confirm (or pin) the base image in the cloned Dockerfile --------
 
@@ -288,6 +288,17 @@ fi
 
 echo
 echo "=== Step 4: build the image locally with CI's flags (~5-10 min) ==="
+# CI's published image is built WITHOUT the repo's .dockerignore taking effect,
+# so it carries the full source tree (tests, docs, examples, etc.). buildx on
+# this host *does* honor .dockerignore, which would strip those files and yield
+# a spurious mismatch against the published image. To reproduce CI's build
+# context exactly, drop the ignore file from the throwaway clone before building
+# (this only touches $WORKDIR/src, never your real checkout). Docker consults a
+# single context-root .dockerignore here, so removing this one file fully
+# disables ignore filtering. Removing it can only ADD files to the comparison —
+# the rebuild then verifies MORE of /mono, not less.
+rm -f "$WORKDIR/src/.dockerignore"
+
 docker buildx build \
   --platform linux/amd64 \
   --no-cache \
