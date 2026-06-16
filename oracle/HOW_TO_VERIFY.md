@@ -22,7 +22,41 @@ docker buildx imagetools inspect gnosischain/tokenbridge-oracle:<VERSION> \
 Output equals `RECORDED_DIGEST` → pass. Mismatch → the tag was re-pointed;
 **stop and investigate.**
 
-## 2. Signature check with cosign (run this too)
+**Example output for v3.11.1**
+
+```bash
+% docker buildx imagetools inspect gnosischain/tokenbridge-oracle:v3.11.1 --format '{{.Manifest.Digest}}'
+
+Name:      docker.io/gnosischain/tokenbridge-oracle:v3.11.1
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:ca55d18213d3ca4c186d9d4076905566ee4e74c62169f7910b83cae400968c2b # <--- Should match this digest
+
+Manifests:
+  Name:        docker.io/gnosischain/tokenbridge-oracle:v3.11.1@sha256:0f3a2c4747010b986c190857b9b9a4271ee02a5232bccd3c1375ae15e8d479f7  # <--- arm64 image (referenced by attestation below)
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/arm64
+
+  Name:        docker.io/gnosischain/tokenbridge-oracle:v3.11.1@sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6 # <--- Needed for cosign verify
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    unknown/unknown
+  Annotations:
+    vnd.docker.reference.digest: sha256:0f3a2c4747010b986c190857b9b9a4271ee02a5232bccd3c1375ae15e8d479f7
+    vnd.docker.reference.type:   attestation-manifest
+
+  Name:        docker.io/gnosischain/tokenbridge-oracle:v3.11.1@sha256:d2bb334032d5c5d0a8674aad79070e0dd94a10fd5c7142e7a136c088441665ab # <--- amd64 image (referenced by attestation below)
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/amd64
+
+  Name:        docker.io/gnosischain/tokenbridge-oracle:v3.11.1@sha256:90d79faa22f9ca7943dd867e704973e2afd36b1b8d706fea4408452649c71eb0 # <--- Needed for cosign verify
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    unknown/unknown
+  Annotations:
+    vnd.docker.reference.digest: sha256:d2bb334032d5c5d0a8674aad79070e0dd94a10fd5c7142e7a136c088441665ab
+    vnd.docker.reference.type:   attestation-manifest
+
+```
+
+## 2. Signature check with cosign
 
 > Checks that the image was built and signed by Docker's `github-builder`
 > workflow on GitHub Actions — anchored in the public Sigstore transparency
@@ -31,12 +65,19 @@ Output equals `RECORDED_DIGEST` → pass. Mismatch → the tag was re-pointed;
 Requires [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/).
 Verify against the digest, not the tag (tags are mutable):
 
+Fetch the attestation manifest hash
+
+**Example for v3.11.1**
+
+1. linux/amd64: `sha256:90d79faa22f9ca7943dd867e704973e2afd36b1b8d706fea4408452649c71eb0`
+2. linux/arm64: `sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6`
+
 ```bash
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github.com/docker/github-builder/.github/workflows/build.yml.*$' \
   --certificate-github-workflow-repository gnosischain/tokenbridge \
-  gnosischain/tokenbridge-oracle@sha256:<RECORDED_DIGEST>
+  gnosischain/tokenbridge-oracle@sha256:<ATTESTATION_DIGEST>
 ```
 
 Success prints the verified claims and the signing certificate's identity.
@@ -46,6 +87,26 @@ also pass.
 
 Note: only releases built by the multi-arch pipeline are signed; older tags (v3.10.0 or less)
 fail with "no matching signatures".
+
+**Example output for v3.11.1**
+
+```bash
+
+% cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/docker/github-builder/.github/workflows/build.yml.*$' \
+  --certificate-github-workflow-repository gnosischain/tokenbridge gnosischain/tokenbridge-oracle@sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6
+
+
+Verification for index.docker.io/gnosischain/tokenbridge-oracle@sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+
+[{"critical":{"identity":{"docker-reference":"index.docker.io/gnosischain/tokenbridge-oracle@sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6"},"image":{"docker-manifest-digest":"sha256:e0d36efecbc63d74d3dad14f2fd09f86f2dd0012f649492cbe8a09b6ef7a45e6"},"type":"https://sigstore.dev/cosign/sign/v1"},"optional":{}}]
+
+```
 
 ## 3. Full audit: rebuild from source (optional, ~10 min)
 

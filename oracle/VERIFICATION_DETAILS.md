@@ -25,11 +25,12 @@ SHA256="sha256sum"                # macOS: SHA256="shasum -a 256"
 
 Digests are never hardcoded; each is read at runtime:
 
-| Variable           | What it is                                 | Source                            |
-| ------------------ | ------------------------------------------ | --------------------------------- |
-| `$BASE_DIGEST`     | `node:12` digest CI resolved at build time | SLSA provenance (Full, Step 2)    |
-| `$RECORDED_DIGEST` | index digest CI recorded for the release   | release **Published image** block |
-| `$LIVE_DIGEST`     | index digest the registry serves now       | `imagetools inspect`              |
+| Variable              | What it is                                      | Source                            |
+| --------------------- | ----------------------------------------------- | --------------------------------- |
+| `$BASE_DIGEST`        | `node:12` digest CI resolved at build time      | SLSA provenance (Full, Step 2)    |
+| `$RECORDED_DIGEST`    | index digest CI recorded for the release        | release **Published image** block |
+| `$LIVE_DIGEST`        | index digest the registry serves now            | `imagetools inspect`              |
+| `$ATTESTATION_DIGEST` | per-platform attestation-manifest digest (signed) | `imagetools inspect` of the index |
 
 ## What the checks do NOT prove
 
@@ -87,14 +88,18 @@ produced by that workflow running on GitHub Actions, with the trust anchor in th
 Sigstore transparency log — it authenticates what the fast check and the provenance reads
 (Full, Step 2) otherwise take on faith from the registry.
 
-Command and details: [`HOW_TO_VERIFY.md` §2](./HOW_TO_VERIFY.md). Verify against
-`$RECORDED_DIGEST`, never the tag.
+Command and details: [`HOW_TO_VERIFY.md` §2](./HOW_TO_VERIFY.md). The signatures live on the
+per-platform **attestation manifests**, not on the index — so verify against
+`$ATTESTATION_DIGEST` (the `attestation-manifest` entries you read out of the index with
+`imagetools inspect`), never the tag and never `$RECORDED_DIGEST` (that index digest only tells
+you _which_ index to enumerate the attestation manifests from).
 
 **Trust:** the certificate identity is the _reusable_ workflow
 (`docker/github-builder/.github/workflows/build.yml@...`), which any repository could call —
-the binding to _this repo's_ build comes from the recorded digest, and cryptographically from
-the `--certificate-github-workflow-repository gnosischain/tokenbridge` pin already included in
-the §2 command. The signature attests _who
+the binding to _this repo's_ build comes cryptographically from the
+`--certificate-github-workflow-repository gnosischain/tokenbridge` pin already included in
+the §2 command, while `$RECORDED_DIGEST` is what binds that index back to the release commit.
+The signature attests _who
 built_ the image, not _what is in_ it (that is the full check), and says nothing about whether
 the CI runner itself was compromised. Tags v3.10.0 and older predate the signing pipeline and
 fail with "no matching signatures".
