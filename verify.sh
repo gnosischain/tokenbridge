@@ -298,6 +298,9 @@ docker buildx build \
   -t "oracle:verify-$TAG" \
   "$WORKDIR/src"
 
+# ignore .dockerignore to match the exact ci build workflow
+rm -f "$WORKDIR/src/.dockerignore"
+
 # --- Step 5: pull the published image ----------------------------------------
 
 echo
