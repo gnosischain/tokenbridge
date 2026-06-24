@@ -6,17 +6,23 @@
 # trust boundary tight. See VERIFICATION_DETAILS.md for rationale and limits.
 #
 # Host requirements: docker (+buildx), git, jq, tar, sha256sum (or shasum), sed.
-# Non-amd64 hosts need linux/amd64 emulation (Docker Desktop enables it); the
-# script probes for it and stops with guidance if missing.
+# Verifying a variant whose arch differs from the host needs that arch's
+# emulation (Docker Desktop enables it); the script probes for it and stops with
+# guidance if missing. Verifying the variant that matches the host is native.
 #
 # Usage:
-#   ./verify.sh <TAG> <EXPECTED_SOURCE_COMMIT>
+#   ./verify.sh <TAG> <EXPECTED_SOURCE_COMMIT> [ARCH]
 #     <TAG>                    published release tag to verify against its source
 #     <EXPECTED_SOURCE_COMMIT> commit SHA the tag MUST resolve to, obtained
 #                            out-of-band. Required: without it a tag re-pointed to a
 #                            matching malicious image would still pass — the rebuild
 #                            only proves image-matches-its-source, not that the source
 #                            is the one you trust. Must be the full 40-character hex SHA.
+#     ARCH                   which published image variant to verify: amd64
+#                            (default) or arm64. This is the TARGET arch — the slice
+#                            of the multi-arch image that gets pulled, rebuilt and
+#                            diffed — not necessarily the host's arch. Omit for the
+#                            common amd64/Ubuntu case.
 #
 # Optional environment variables:
 #   SOURCE_REPO            git remote URL          (default: gnosischain/tokenbridge)
@@ -35,13 +41,32 @@ set -euo pipefail
 
 TAG="${1:-}"
 EXPECTED_SOURCE_COMMIT="${2:-}"
+ARCH="${3:-amd64}"
 if [[ -z "$TAG" || -z "$EXPECTED_SOURCE_COMMIT" ]]; then
-  echo "Usage: $0 <TAG> <EXPECTED_SOURCE_COMMIT>" >&2
+  echo "Usage: $0 <TAG> <EXPECTED_SOURCE_COMMIT> [ARCH]" >&2
   echo "  EXPECTED_SOURCE_COMMIT is required: without it a tag re-pointed to a matching" >&2
   echo "  malicious image would still pass. Obtain the commit out-of-band." >&2
+  echo "  ARCH is the TARGET image variant to verify: amd64 (default) or arm64." >&2
+  echo "  Omit it for the common amd64/Ubuntu case." >&2
   echo "  See oracle/VERIFICATION_DETAILS.md." >&2
   exit 2
 fi
+
+# ARCH selects which published variant to verify (the image is multi-arch:
+# linux/amd64, linux/arm64). It is the TARGET, independent of the host: the host
+# arch only decides whether emulation is needed (see preflight below). The
+# base-image pin is the same multi-arch index digest for both arches, so ARCH
+# only changes the build/pull/export platform and the provenance platform key.
+case "$ARCH" in
+  amd64|x86_64|linux/amd64) ARCH=amd64 ;;
+  arm64|aarch64|linux/arm64) ARCH=arm64 ;;
+  *)
+    echo "ERROR: ARCH must be 'amd64' or 'arm64' (got: $ARCH)." >&2
+    exit 2
+    ;;
+esac
+PLATFORM="linux/$ARCH"
+
 SOURCE_REPO="${SOURCE_REPO:-https://github.com/gnosischain/tokenbridge.git}"
 IMAGE_REPO="${IMAGE_REPO:-gnosischain/tokenbridge-oracle}"
 BASE_IMAGE_PKG="${BASE_IMAGE_PKG:-pkg:docker/node}"
@@ -78,21 +103,28 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-# Need linux/amd64 emulation on non-amd64 hosts.
-HOST_ARCH="$(uname -m)"
-if [[ "$HOST_ARCH" != "x86_64" && "$HOST_ARCH" != "amd64" ]]; then
-  echo "Host architecture is $HOST_ARCH — checking linux/amd64 emulation..."
-  if ! docker run --rm --platform linux/amd64 hello-world >/dev/null 2>&1; then
-    echo "ERROR: this $HOST_ARCH host cannot run linux/amd64 images." >&2
-    echo "       This script builds and compares a linux/amd64 image, which needs" >&2
-    echo "       QEMU amd64 emulation registered with the Docker daemon." >&2
+# Map the host arch to docker's naming, then emulate only when the target arch
+# (ARCH) differs from the host — verifying the matching variant is native.
+case "$(uname -m)" in
+  x86_64|amd64) HOST_ARCH=amd64 ;;
+  arm64|aarch64) HOST_ARCH=arm64 ;;
+  *) HOST_ARCH="$(uname -m)" ;;
+esac
+echo "Host arch: $HOST_ARCH — verifying $PLATFORM variant."
+if [[ "$HOST_ARCH" != "$ARCH" ]]; then
+  echo "Target $PLATFORM differs from host — checking $PLATFORM emulation..."
+  if ! docker run --rm --platform "$PLATFORM" hello-world >/dev/null 2>&1; then
+    echo "ERROR: this $HOST_ARCH host cannot run $PLATFORM images." >&2
+    echo "       Verifying the $PLATFORM variant from this host needs QEMU $ARCH" >&2
+    echo "       emulation registered with the Docker daemon." >&2
     echo >&2
     echo "       Docker Desktop enables this by default — if you use it, ensure" >&2
-    echo "       'Use Rosetta for x86_64/amd64 emulation' (or QEMU) is on under" >&2
-    echo "       Settings > General, restart the daemon, and re-run this script." >&2
+    echo "       emulation (Rosetta/QEMU) is on under Settings > General, restart" >&2
+    echo "       the daemon, and re-run. Or run with ARCH=$HOST_ARCH to verify the" >&2
+    echo "       variant that matches this host natively." >&2
     exit 2
   fi
-  echo "linux/amd64 emulation OK."
+  echo "$PLATFORM emulation OK."
 fi
 
 WORKDIR="$(mktemp -d -t tokenbridge-verify-XXXXXX)"
@@ -143,8 +175,8 @@ echo "=== Step 2: resolve base-image digest from published SLSA provenance ==="
 # The lookup path varies along two axes:
 #   - platform layout: single-platform images expose provenance at
 #     .Provenance.SLSA; multi-platform images key it by platform, so the
-#     linux/amd64 slice (the one rebuilt below) lives at
-#     (index .Provenance "linux/amd64").SLSA.
+#     target slice (the one rebuilt below, $PLATFORM) lives at
+#     (index .Provenance "$PLATFORM").SLSA.
 #   - SLSA version: the base image is under buildDefinition.resolvedDependencies
 #     in v1.0 and materials in v0.2.
 # prov_field tries each format in order and returns the first non-null hit; a
@@ -163,8 +195,8 @@ prov_field() {
 }
 
 DEPS=$(prov_field \
-  '{{json (index .Provenance "linux/amd64").SLSA.buildDefinition.resolvedDependencies}}' \
-  '{{json (index .Provenance "linux/amd64").SLSA.materials}}' \
+  '{{json (index .Provenance "'"$PLATFORM"'").SLSA.buildDefinition.resolvedDependencies}}' \
+  '{{json (index .Provenance "'"$PLATFORM"'").SLSA.materials}}' \
   '{{json .Provenance.SLSA.buildDefinition.resolvedDependencies}}' \
   '{{json .Provenance.SLSA.materials}}')
 
@@ -197,8 +229,8 @@ NODE_DIGEST="$NODE_DIGESTS"
 # Build metadata: timestamps and the VCS revision the image claims, with the
 # same platform-layout and v1.0/v0.2 path splits as above.
 META=$(prov_field \
-  '{{json (index .Provenance "linux/amd64").SLSA.runDetails.metadata}}' \
-  '{{json (index .Provenance "linux/amd64").SLSA.metadata}}' \
+  '{{json (index .Provenance "'"$PLATFORM"'").SLSA.runDetails.metadata}}' \
+  '{{json (index .Provenance "'"$PLATFORM"'").SLSA.metadata}}' \
   '{{json .Provenance.SLSA.runDetails.metadata}}' \
   '{{json .Provenance.SLSA.metadata}}')
 STARTED=$(echo "$META" | jq -r '.startedOn // .buildStartedOn // "unknown"')
@@ -288,8 +320,11 @@ fi
 
 echo
 echo "=== Step 4: build the image locally with CI's flags (~5-10 min) ==="
+
+rm -f "$WORKDIR/src/.dockerignore"
+
 docker buildx build \
-  --platform linux/amd64 \
+  --platform "$PLATFORM" \
   --no-cache \
   --provenance=false \
   --sbom=false \
@@ -298,14 +333,11 @@ docker buildx build \
   -t "oracle:verify-$TAG" \
   "$WORKDIR/src"
 
-# ignore .dockerignore to match the exact ci build workflow
-rm -f "$WORKDIR/src/.dockerignore"
-
 # --- Step 5: pull the published image ----------------------------------------
 
 echo
 echo "=== Step 5: pull the published image ==="
-docker pull --platform linux/amd64 "$IMAGE_REPO:$TAG"
+docker pull --platform "$PLATFORM" "$IMAGE_REPO:$TAG"
 
 # --- Step 6: export both filesystems -----------------------------------------
 
@@ -313,11 +345,11 @@ echo
 echo "=== Step 6: export both filesystems ==="
 mkdir -p "$WORKDIR/pub-fs" "$WORKDIR/loc-fs"
 
-PUB_CID=$(docker create "$IMAGE_REPO:$TAG")
+PUB_CID=$(docker create --platform "$PLATFORM" "$IMAGE_REPO:$TAG")
 docker export "$PUB_CID" | tar -x -C "$WORKDIR/pub-fs"
 docker rm "$PUB_CID" >/dev/null
 
-LOC_CID=$(docker create "oracle:verify-$TAG")
+LOC_CID=$(docker create --platform "$PLATFORM" "oracle:verify-$TAG")
 docker export "$LOC_CID" | tar -x -C "$WORKDIR/loc-fs"
 docker rm "$LOC_CID" >/dev/null
 
@@ -345,6 +377,7 @@ if diff -q "$WORKDIR/pub.hashes" "$WORKDIR/loc.hashes" >/dev/null; then
   echo "  $COUNT files under /mono are byte-identical."
   echo
   echo "  Tag:           $TAG"
+  echo "  Platform:      $PLATFORM"
   echo "  Source commit: $SOURCE_COMMIT"
   echo "  Source repo:   $SOURCE_REPO"
   echo "  Image:         $IMAGE_REPO:$TAG"
