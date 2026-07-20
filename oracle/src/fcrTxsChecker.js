@@ -13,30 +13,31 @@ if (process.argv.length < 3) {
 
 const config = require(path.join('../config/', process.argv[2]))
 
-const { web3, pollingInterval, blockProcessingMode } = config.main
+// Validate whichever side(s)(chains) run in FCR mode.
+const fcrSides = [config.home, config.foreign].filter((side) => side && side.blockProcessingMode === 'fcr')
 
-const pendingSafeBlocksRedisKey = `${config.id}:pendingSafeBlocks`
-const pendingSafeTxsRedisKey = (blockHash) => `${config.id}:pendingSafeTxs:${blockHash}`
-const falsePositivesRedisKey = `${config.id}:safeTxFalsePositives`
+const pendingSafeBlocksRedisKey = (chain) => `${chain}:pendingSafeBlocks`
+const pendingSafeTxsRedisKey = (chain, blockHash) => `${chain}:pendingSafeTxs:${blockHash}`
+const falsePositivesRedisKey = (chain) => `${chain}:safeTxFalsePositives`
 
 // Backlog above this many pending safe blocks means the Checker is stalled or
 // finality is not advancing — warn rather than let redis grow silently.
 const PENDING_BACKLOG_WARN_THRESHOLD = 10000
 
+// Loop interval: the fastest polling among the active sides.
+const pollingInterval = fcrSides.length ? Math.min(...fcrSides.map((side) => side.pollingInterval)) : 0
+
 async function initialize() {
   try {
-    if (!config.id) {
-      logger.fatal('ORACLE_FCR_VALIDATE_ID is not set — cannot determine which watcher to validate')
-      process.exit(EXIT_CODES.INCOMPATIBILITY)
-    }
-    if (blockProcessingMode !== 'fcr') {
-      logger.info({ blockProcessingMode }, 'Block processing mode is not fcr, Checker not required')
+    if (fcrSides.length === 0) {
+      logger.info('No chain is in fcr mode, Checker not required')
       process.exit(EXIT_CODES.WATCHER_NOT_REQUIRED)
     }
 
     const checkHttps = checkHTTPS(process.env.ORACLE_ALLOW_HTTP_FOR_RPC, logger)
-    web3.currentProvider.urls.forEach(checkHttps(config.id))
+    fcrSides.forEach((side) => side.web3.currentProvider.urls.forEach(checkHttps(side.chain)))
 
+    logger.info({ chains: fcrSides.map((side) => side.chain) }, 'FCR txs checker started')
     runMain()
   } catch (e) {
     logger.error(e)
@@ -71,45 +72,51 @@ async function runMain() {
 
 // Remove a resolved (matched or recorded) block from the pending set and drop its
 // per-block attribution set.
-function resolveBlock(blockHash) {
-  return redis.pipeline().zrem(pendingSafeBlocksRedisKey, blockHash).del(pendingSafeTxsRedisKey(blockHash)).exec()
+function resolveBlock(chain, blockHash) {
+  return redis
+    .pipeline()
+    .zrem(pendingSafeBlocksRedisKey(chain), blockHash)
+    .del(pendingSafeTxsRedisKey(chain, blockHash))
+    .exec()
 }
 
 // The stored source block's hash no longer matches the canonical finalized block at
 // that height: the event(s) we attested to were reorged out. Record each affected
 // bridge message and alert.
-async function recordFalsePositive(blockNumber, storedBlockHash, canonicalBlockHash, detectedAt) {
-  const eventKeys = await redis.smembers(pendingSafeTxsRedisKey(storedBlockHash))
+async function recordFalsePositive(chain, blockNumber, storedBlockHash, canonicalBlockHash, detectedAt) {
+  const eventKeys = await redis.smembers(pendingSafeTxsRedisKey(chain, storedBlockHash))
   const pipeline = redis.pipeline()
   eventKeys.forEach((ek) => {
     // eventKey = `${transactionHash}-${logIndex}`; txHash has no dash, split on the last one
     const sep = ek.lastIndexOf('-')
     const txHash = ek.slice(0, sep)
     const logIndex = ek.slice(sep + 1)
-    const record = { txHash, logIndex, blockNumber, storedBlockHash, canonicalBlockHash, detectedAt }
+    const record = { chain, txHash, logIndex, blockNumber, storedBlockHash, canonicalBlockHash, detectedAt }
     logger.error(record, 'FCR false positive: source block reorged out after attestation')
-    pipeline.rpush(falsePositivesRedisKey, JSON.stringify(record))
+    pipeline.rpush(falsePositivesRedisKey(chain), JSON.stringify(record))
   })
   await pipeline.exec()
-  await resolveBlock(storedBlockHash)
+  await resolveBlock(chain, storedBlockHash)
 }
 
-async function main() {
+async function validateChain(side) {
+  const { chain, web3 } = side
+
   const finalized = await getBlockNumber(web3, 'finalized')
   if (!finalized) {
-    logger.debug('Finalized block not available yet, skipping cycle')
+    logger.debug({ chain }, 'Finalized block not available yet, skipping chain')
     return
   }
 
-  const pendingCount = await redis.zcard(pendingSafeBlocksRedisKey)
+  const pendingCount = await redis.zcard(pendingSafeBlocksRedisKey(chain))
   if (pendingCount > PENDING_BACKLOG_WARN_THRESHOLD) {
-    logger.warn({ pendingCount, finalized }, 'Pending safe blocks backlog is large, Checker may be stalled')
+    logger.warn({ chain, pendingCount, finalized }, 'Pending safe blocks backlog is large, Checker may be stalled')
   }
 
   // members with score (blockNumber) <= finalized, as [blockHash, blockNumber, ...]
-  const due = await redis.zrangebyscore(pendingSafeBlocksRedisKey, 0, finalized, 'WITHSCORES')
+  const due = await redis.zrangebyscore(pendingSafeBlocksRedisKey(chain), 0, finalized, 'WITHSCORES')
   if (due.length === 0) {
-    logger.debug({ finalized }, 'No finalized safe blocks to validate')
+    logger.debug({ chain, finalized }, 'No finalized safe blocks to validate')
     return
   }
 
@@ -128,20 +135,39 @@ async function main() {
     const canonical = await web3.eth.getBlock(blockNumber)
     if (!canonical) {
       // do NOT prune — dropping would read as "verified"; retry next cycle
-      logger.warn({ blockNumber }, 'Canonical block not returned, will retry next cycle')
+      logger.warn({ chain, blockNumber }, 'Canonical block not returned, will retry next cycle')
       continue
     }
     for (const storedHash of storedHashes) {
       if (storedHash === canonical.hash) {
-        logger.debug({ blockNumber, blockHash: storedHash }, 'Safe block confirmed canonical at finality')
-        await resolveBlock(storedHash)
+        logger.debug({ chain, blockNumber, blockHash: storedHash }, 'Safe block confirmed canonical at finality')
+        await resolveBlock(chain, storedHash)
       } else {
-        await recordFalsePositive(blockNumber, storedHash, canonical.hash, finalized)
+        await recordFalsePositive(chain, blockNumber, storedHash, canonical.hash, finalized)
       }
     }
   }
+}
 
+async function main() {
+  for (const side of fcrSides) {
+    await validateChain(side)
+  }
   logger.debug('Finished')
 }
 
-initialize()
+if (process.env.NODE_ENV !== 'test') {
+  initialize()
+}
+
+module.exports = {
+  fcrSides,
+  validateChain,
+  recordFalsePositive,
+  resolveBlock,
+  main,
+  pendingSafeBlocksRedisKey,
+  pendingSafeTxsRedisKey,
+  falsePositivesRedisKey,
+  PENDING_BACKLOG_WARN_THRESHOLD,
+}
