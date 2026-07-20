@@ -54,9 +54,19 @@ Grafana reads redis directly via the **Redis datasource plugin**:
 - `LLEN <chain>:safeTxFalsePositives` — false-positive count (alert on `> 0`)
 - `LRANGE <chain>:safeTxFalsePositives 0 -1` — false-positive detail records
 
+## Test
+
+### Unit Test
+
+```bash
+nvm use 12.22.12
+cd oracle
+NODE_ENV=test ../node_modules/.bin/mocha --exit --timeout 10000 test/fcrTxsChecker.test.js
+```
+
 ## ToDo List
 
 - [x] Code
-- [ ] Unit Test
+- [x] Unit Test
 - [ ] Integration test
 - [ ] Docker compose
