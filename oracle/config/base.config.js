@@ -5,7 +5,7 @@ const {
   HOME_ERC_TO_NATIVE_ABI,
   FOREIGN_ERC_TO_NATIVE_ABI,
   HOME_AMB_ABI,
-  FOREIGN_AMB_ABI
+  FOREIGN_AMB_ABI,
 } = require('../../commons')
 const {
   web3Home,
@@ -14,7 +14,7 @@ const {
   web3HomeFallback,
   web3ForeignRedundant,
   web3ForeignFallback,
-  web3ForeignArchive
+  web3ForeignArchive,
 } = require('../src/services/web3')
 const { add0xPrefix, privateKeyToAddress } = require('../src/utils/utils')
 const { EXIT_CODES } = require('../src/utils/constants')
@@ -41,7 +41,9 @@ const {
   ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY,
   ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL,
   ORACLE_FOREIGN_BEACON_URL,
-  ORACLE_HOME_BEACON_URL
+  ORACLE_HOME_BEACON_URL,
+  ORACLE_FOREIGN_BLOCK_PROCESSING_MODE,
+  ORACLE_HOME_BLOCK_PROCESSING_MODE,
 } = process.env
 
 let homeAbi
@@ -86,9 +88,14 @@ const homeConfig = {
   reprocessingOptions: {
     enabled: ORACLE_HOME_EVENTS_REPROCESSING === 'true',
     batchSize: parseInt(ORACLE_HOME_EVENTS_REPROCESSING_BATCH_SIZE, 10) || 1000,
-    blockDelay: parseInt(ORACLE_HOME_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 500
+    blockDelay: parseInt(ORACLE_HOME_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 500,
   },
-  beaconChainUrl: ORACLE_HOME_BEACON_URL ? ORACLE_HOME_BEACON_URL.split(',').map(url => url.trim()).filter(url => url) : []
+  beaconChainUrl: ORACLE_HOME_BEACON_URL
+    ? ORACLE_HOME_BEACON_URL.split(',')
+        .map((url) => url.trim())
+        .filter((url) => url)
+    : [],
+  blockProcessingMode: ORACLE_HOME_BLOCK_PROCESSING_MODE,
 }
 
 const foreignContract = new web3Foreign.eth.Contract(foreignAbi, COMMON_FOREIGN_BRIDGE_ADDRESS)
@@ -109,9 +116,14 @@ const foreignConfig = {
   reprocessingOptions: {
     enabled: ORACLE_FOREIGN_EVENTS_REPROCESSING === 'true',
     batchSize: parseInt(ORACLE_FOREIGN_EVENTS_REPROCESSING_BATCH_SIZE, 10) || 500,
-    blockDelay: parseInt(ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 250
+    blockDelay: parseInt(ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY, 10) || 250,
   },
-  beaconChainUrl: ORACLE_FOREIGN_BEACON_URL ? ORACLE_FOREIGN_BEACON_URL.split(',').map(url => url.trim()).filter(url => url) : []
+  beaconChainUrl: ORACLE_FOREIGN_BEACON_URL
+    ? ORACLE_FOREIGN_BEACON_URL.split(',')
+        .map((url) => url.trim())
+        .filter((url) => url)
+    : [],
+  blockProcessingMode: ORACLE_FOREIGN_BLOCK_PROCESSING_MODE,
 }
 
 const maxProcessingTime =
@@ -123,7 +135,7 @@ if (ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY) {
   const derived = privateKeyToAddress(validatorPrivateKey)
   if (ORACLE_VALIDATOR_ADDRESS && derived.toLowerCase() !== ORACLE_VALIDATOR_ADDRESS.toLowerCase()) {
     console.error(
-      `Derived address from private key - ${derived} is different from ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}`
+      `Derived address from private key - ${derived} is different from ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}`,
     )
     process.exit(EXIT_CODES.INCOMPATIBILITY)
   }
@@ -137,5 +149,5 @@ module.exports = {
   shutdownKey: 'oracle-shutdown',
   home: homeConfig,
   foreign: foreignConfig,
-  id
+  id,
 }

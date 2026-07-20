@@ -1,5 +1,5 @@
 const logger = require('../services/logger').child({
-  module: 'web3'
+  module: 'web3',
 })
 const { BRIDGE_VALIDATORS_ABI } = require('../../../commons')
 
@@ -15,10 +15,21 @@ async function getNonce(web3, address) {
   }
 }
 
-async function getBlockNumber(web3) {
+async function getBlockNumber(web3, type = 'latest') {
   try {
-    logger.debug('Getting block number')
-    const blockNumber = await web3.eth.getBlockNumber()
+    logger.debug(`Getting block number for type: ${type}`)
+    let blockNumber = 0
+
+    if (type === 'safe') {
+      blockNumber = await web3.eth.getBlockNumber('safe')
+    }
+    if (type === 'finalized') {
+      blockNumber = await web3.eth.getBlockNumber('finalized')
+    }
+    if (type === 'latest') {
+      blockNumber = await web3.eth.getBlockNumber()
+    }
+
     logger.debug({ blockNumber }, 'Block number obtained')
     return blockNumber
   } catch (e) {
@@ -51,6 +62,7 @@ async function getChainId(web3) {
   }
 }
 
+// Not used
 async function getRequiredBlockConfirmations(contract) {
   try {
     const contractAddress = contract.options.address
@@ -83,7 +95,7 @@ async function getEvents({ contract, event, fromBlock, toBlock, filter }) {
     const contractAddress = contract.options.address
     logger.info(
       { contractAddress, event, fromBlock: fromBlock.toString(), toBlock: toBlock.toString() },
-      'Getting past events'
+      'Getting past events',
     )
     const pastEvents = await contract.getPastEvents(event, { fromBlock, toBlock, filter })
     logger.debug({ contractAddress, event, count: pastEvents.length }, 'Past events obtained')
@@ -99,17 +111,17 @@ async function getEventsFromTx({ web3, contract, event, txHash, filter }) {
     const contractAddress = contract.options.address
     logger.info({ contractAddress, event, txHash }, 'Getting past events for specific transaction')
     const { logs } = await web3.eth.getTransactionReceipt(txHash)
-    const eventAbi = contract.options.jsonInterface.find(abi => abi.name === event)
+    const eventAbi = contract.options.jsonInterface.find((abi) => abi.name === event)
     const decodeAbi = contract._decodeEventABI.bind(eventAbi)
     const pastEvents = logs
-      .filter(event => event.address.toLowerCase() === contractAddress.toLowerCase())
-      .filter(event => event.topics[0] === eventAbi.signature)
+      .filter((event) => event.address.toLowerCase() === contractAddress.toLowerCase())
+      .filter((event) => event.topics[0] === eventAbi.signature)
       .map(decodeAbi)
-      .filter(event =>
-        eventAbi.inputs.every(arg => {
-          const encodeParam = param => web3.eth.abi.encodeParameter(arg.type, param)
+      .filter((event) =>
+        eventAbi.inputs.every((arg) => {
+          const encodeParam = (param) => web3.eth.abi.encodeParameter(arg.type, param)
           return !filter[arg.name] || encodeParam(filter[arg.name]) === encodeParam(event.returnValues[arg.name])
-        })
+        }),
       )
     logger.debug({ contractAddress, event, count: pastEvents.length }, 'Past events obtained')
     return pastEvents
@@ -127,5 +139,5 @@ module.exports = {
   getRequiredBlockConfirmations,
   getValidatorContract,
   getEvents,
-  getEventsFromTx
+  getEventsFromTx,
 }
