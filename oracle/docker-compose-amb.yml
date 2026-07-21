@@ -26,6 +26,7 @@ services:
       - net_db_bridge_senderhome_amb
       - net_db_bridge_senderforeign_amb
       - net_db_bridge_shutdown_amb
+      - net_db_bridge_fcrvalidator_amb
     restart: unless-stopped
     volumes: ['~/bridge_data/redis_amb:/data']
     ports:
@@ -93,6 +94,17 @@ services:
     entrypoint: yarn manager:shutdown
     networks:
       - net_db_bridge_shutdown_amb
+  bridge_fcrvalidator_amb:
+    cpus: 0.1
+    mem_limit: 500m
+    image: gnosischain/tokenbridge-oracle:v3.11.0
+    env_file: ./.env.amb
+    environment:
+      - NODE_ENV=production
+    restart: on-failure
+    entrypoint: yarn validator:fcr-txs
+    networks:
+      - net_db_bridge_fcrvalidator_amb
 
 networks:
   net_db_bridge_request_amb:
@@ -104,6 +116,8 @@ networks:
   net_db_bridge_senderforeign_amb:
     driver: bridge
   net_db_bridge_shutdown_amb:
+    driver: bridge
+  net_db_bridge_fcrvalidator_amb:
     driver: bridge
   net_rabbit_bridge_request_amb:
     driver: bridge

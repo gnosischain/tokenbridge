@@ -28,6 +28,7 @@ services:
       - net_db_bridge_senderhome
       - net_db_bridge_senderforeign
       - net_db_bridge_shutdown
+      - net_db_bridge_fcrvalidator
     restart: unless-stopped
     volumes: ['~/bridge_data/redis:/data']
   bridge_request:
@@ -106,6 +107,17 @@ services:
     entrypoint: yarn manager:shutdown
     networks:
       - net_db_bridge_shutdown
+  bridge_fcrvalidator:
+    cpus: 0.1
+    mem_limit: 500m
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: ./.env
+    environment:
+      - NODE_ENV=production
+    restart: on-failure
+    entrypoint: yarn validator:fcr-txs
+    networks:
+      - net_db_bridge_fcrvalidator
 
 networks:
   net_db_bridge_request:
@@ -119,6 +131,8 @@ networks:
   net_db_bridge_senderforeign:
     driver: bridge
   net_db_bridge_shutdown:
+    driver: bridge
+  net_db_bridge_fcrvalidator:
     driver: bridge
   net_rabbit_bridge_request:
     driver: bridge
