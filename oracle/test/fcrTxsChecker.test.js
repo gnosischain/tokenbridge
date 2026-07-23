@@ -154,6 +154,20 @@ describe('fcrTxsChecker', () => {
       expect(loggerStub.error.called).to.be.false
     })
 
+    it('Case 3b: matches case-insensitively — mixed-case stored hash vs lowercase canonical is pruned, not flagged', async () => {
+      getBlockNumberStub.resolves(1005)
+      redisStub.zrangebyscore.resolves(['0xAbCd', '997'])
+      side.web3.eth.getBlock.resolves({ hash: '0xabcd' })
+
+      await checker.validateChain(side)
+
+      // pruned using the stored casing, and NOT recorded as a false positive
+      expect(pipeline.zrem.calledWith('home:pendingSafeBlocks', '0xAbCd')).to.be.true
+      expect(pipeline.del.calledWith('home:pendingSafeTxs:0xAbCd')).to.be.true
+      expect(pipeline.rpush.called).to.be.false
+      expect(loggerStub.error.called).to.be.false
+    })
+
     it('Case 4: records a false positive when the stored hash no longer matches', async () => {
       getBlockNumberStub.resolves(1005)
       redisStub.zrangebyscore.resolves(['0xB999', '999'])
@@ -268,7 +282,7 @@ describe('fcrTxsChecker', () => {
     })
   })
 
-  describe('main', () => {
+  describe('main (fcrTxsChecker)', () => {
     it('validates every fcr side each cycle', async () => {
       const checker = loadChecker({
         config: {
@@ -296,5 +310,127 @@ describe('fcrTxsChecker', () => {
 
       expect(getBlockNumberStub.calledTwice).to.be.true
     })
+  })
+})
+
+describe('verifySafeBlockSupport', () => {
+  let loggerStub
+  let verifySafeBlockSupport
+
+  // Load src/tx/web3.js with a quiet logger. Real constants/commons load through.
+  function loadWeb3() {
+    const web3Module = proxyquire('../src/tx/web3', {
+      '../services/logger': { child: () => loggerStub }
+    })
+    return web3Module.verifySafeBlockSupport
+  }
+
+  // verifySafeBlockSupport reads safe/finalized/latest via rawGetBlockByTag, which calls
+  // web3.currentProvider.send({ method: 'eth_getBlockByNumber', params: [tag, false] }, cb)
+  // and decodes block.number with web3.utils.hexToNumber. This mock lets each test queue
+  // per-tag responses; entry N drives call N (the last entry repeats for further calls).
+  // Response builders below map to the raw helper's branches.
+  const okBlock = block => () => ({ jsonrpc: '2.0', result: block }) // -> resolves block
+  const nullResult = () => () => ({ jsonrpc: '2.0', result: null }) // -> resolves null
+  const sendError = msg => () => {
+    throw new Error(msg)
+  } // -> provider send fails, helper rejects
+
+  function makeWeb3() {
+    const behaviors = {} // tag -> [thunk, ...]
+    const calls = {} // tag -> count
+    return {
+      utils: { hexToNumber: x => x }, // blocks are stubbed with numeric `number` already
+      currentProvider: {
+        send(payload, cb) {
+          const tag = payload.params[0]
+          calls[tag] = (calls[tag] || 0) + 1
+          const seq = behaviors[tag] || []
+          const thunk = seq[Math.min(calls[tag] - 1, seq.length - 1)]
+          try {
+            cb(null, thunk ? thunk() : { jsonrpc: '2.0', result: null })
+          } catch (e) {
+            cb(e)
+          }
+        }
+      },
+      _stubTag(tag, ...responses) {
+        behaviors[tag] = responses
+      },
+      _callCount(tag) {
+        return calls[tag] || 0
+      }
+    }
+  }
+
+  // opts with no sleeping and a small retry budget so tests are fast.
+  const fastOpts = { retries: 3, delayMs: 0, maxGap: 32 }
+
+  beforeEach(() => {
+    loggerStub = {
+      error: sinon.stub(),
+      info: sinon.stub(),
+      debug: sinon.stub(),
+      warn: sinon.stub(),
+      fatal: sinon.stub()
+    }
+    verifySafeBlockSupport = loadWeb3()
+  })
+
+  afterEach(() => {
+    sinon.restore()
+  })
+
+  it('supported: safe resolves and the gap to latest is below the threshold', async () => {
+    const web3 = makeWeb3()
+    web3._stubTag('safe', okBlock({ number: 100 }))
+    web3._stubTag('latest', okBlock({ number: 110 }))
+
+    const result = await verifySafeBlockSupport(web3, fastOpts)
+
+    expect(result).to.deep.equal({ supported: true, gap: 10, safe: 100, latest: 110 })
+  })
+
+  it('demote: gap to latest is at/above the threshold', async () => {
+    const web3 = makeWeb3()
+    web3._stubTag('safe', okBlock({ number: 100 }))
+    web3._stubTag('latest', okBlock({ number: 140 }))
+
+    const result = await verifySafeBlockSupport(web3, fastOpts)
+
+    expect(result).to.deep.include({ supported: false, reason: 'gap-too-large', gap: 40 })
+  })
+
+  it('demote: safe unavailable (null every attempt) but finalized resolves', async () => {
+    const web3 = makeWeb3()
+    web3._stubTag('safe', nullResult())
+    web3._stubTag('finalized', okBlock({ number: 90 }))
+
+    const result = await verifySafeBlockSupport(web3, fastOpts)
+
+    expect(result).to.deep.equal({ supported: false, reason: 'safe-unavailable-finalized-ok' })
+    // exhausted the safe retry budget before falling back
+    expect(web3._callCount('safe')).to.equal(3)
+  })
+
+  it('supported: safe errors then succeeds within the retry budget', async () => {
+    const web3 = makeWeb3()
+    // first safe probe fails, second succeeds
+    web3._stubTag('safe', sendError('safe not ready'), okBlock({ number: 100 }))
+    web3._stubTag('latest', okBlock({ number: 105 }))
+
+    const result = await verifySafeBlockSupport(web3, fastOpts)
+
+    expect(result).to.deep.equal({ supported: true, gap: 5, safe: 100, latest: 105 })
+  })
+
+  it('fatal: both safe and finalized fail every attempt', async () => {
+    const web3 = makeWeb3()
+    web3._stubTag('safe', sendError('down'))
+    web3._stubTag('finalized', sendError('down'))
+
+    const result = await verifySafeBlockSupport(web3, fastOpts)
+
+    expect(result).to.deep.equal({ supported: false, fatal: true, reason: 'all-rpc-failed' })
   })
 })

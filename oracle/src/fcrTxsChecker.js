@@ -14,18 +14,18 @@ if (process.argv.length < 3) {
 const config = require(path.join('../config/', process.argv[2]))
 
 // Validate whichever side(s)(chains) run in FCR mode.
-const fcrSides = [config.home, config.foreign].filter((side) => side && side.blockProcessingMode === 'fcr')
+const fcrSides = [config.home, config.foreign].filter(side => side && side.blockProcessingMode === 'fcr')
 
-const pendingSafeBlocksRedisKey = (chain) => `${chain}:pendingSafeBlocks`
+const pendingSafeBlocksRedisKey = chain => `${chain}:pendingSafeBlocks`
 const pendingSafeTxsRedisKey = (chain, blockHash) => `${chain}:pendingSafeTxs:${blockHash}`
-const falsePositivesRedisKey = (chain) => `${chain}:safeTxFalsePositives`
+const falsePositivesRedisKey = chain => `${chain}:safeTxFalsePositives`
 
 // Backlog above this many pending safe blocks means the Checker is stalled or
 // finality is not advancing — warn rather than let redis grow silently.
 const PENDING_BACKLOG_WARN_THRESHOLD = 10000
 
 // Loop interval: the fastest polling among the active sides.
-const pollingInterval = fcrSides.length ? Math.min(...fcrSides.map((side) => side.pollingInterval)) : 0
+const pollingInterval = fcrSides.length ? Math.min(...fcrSides.map(side => side.pollingInterval)) : 0
 
 async function initialize() {
   try {
@@ -35,9 +35,9 @@ async function initialize() {
     }
 
     const checkHttps = checkHTTPS(process.env.ORACLE_ALLOW_HTTP_FOR_RPC, logger)
-    fcrSides.forEach((side) => side.web3.currentProvider.urls.forEach(checkHttps(side.chain)))
+    fcrSides.forEach(side => side.web3.currentProvider.urls.forEach(checkHttps(side.chain)))
 
-    logger.info({ chains: fcrSides.map((side) => side.chain) }, 'FCR txs checker started')
+    logger.info({ chains: fcrSides.map(side => side.chain) }, 'FCR txs checker started')
     runMain()
   } catch (e) {
     logger.error(e)
@@ -49,14 +49,10 @@ async function runMain() {
   try {
     if (redis.status === 'ready') {
       if (config.maxProcessingTime) {
-        await watchdog(
-          () => main(),
-          config.maxProcessingTime,
-          () => {
-            logger.fatal('Max processing time reached')
-            process.exit(EXIT_CODES.MAX_TIME_REACHED)
-          },
-        )
+        await watchdog(() => main(), config.maxProcessingTime, () => {
+          logger.fatal('Max processing time reached')
+          process.exit(EXIT_CODES.MAX_TIME_REACHED)
+        })
       } else {
         await main()
       }
@@ -86,7 +82,7 @@ function resolveBlock(chain, blockHash) {
 async function recordFalsePositive(chain, blockNumber, storedBlockHash, canonicalBlockHash, detectedAt) {
   const eventKeys = await redis.smembers(pendingSafeTxsRedisKey(chain, storedBlockHash))
   const pipeline = redis.pipeline()
-  eventKeys.forEach((ek) => {
+  eventKeys.forEach(ek => {
     // eventKey = `${transactionHash}-${logIndex}`; txHash has no dash, split on the last one
     const sep = ek.lastIndexOf('-')
     const txHash = ek.slice(0, sep)
@@ -138,8 +134,10 @@ async function validateChain(side) {
       logger.warn({ chain, blockNumber }, 'Canonical block not returned, will retry next cycle')
       continue
     }
+
+    const canonicalHash = canonical.hash.toLowerCase()
     for (const storedHash of storedHashes) {
-      if (storedHash === canonical.hash) {
+      if (storedHash.toLowerCase() === canonicalHash) {
         logger.debug({ chain, blockNumber, blockHash: storedHash }, 'Safe block confirmed canonical at finality')
         await resolveBlock(chain, storedHash)
       } else {
@@ -169,5 +167,5 @@ module.exports = {
   pendingSafeBlocksRedisKey,
   pendingSafeTxsRedisKey,
   falsePositivesRedisKey,
-  PENDING_BACKLOG_WARN_THRESHOLD,
+  PENDING_BACKLOG_WARN_THRESHOLD
 }
