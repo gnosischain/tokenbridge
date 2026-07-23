@@ -33,7 +33,7 @@ services:
   bridge_request_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -46,7 +46,7 @@ services:
   bridge_affirmation_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -59,7 +59,7 @@ services:
   bridge_senderhome_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -72,7 +72,7 @@ services:
   bridge_senderforeign_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -85,7 +85,7 @@ services:
   bridge_shutdown_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production
@@ -96,7 +96,7 @@ services:
   bridge_fcrvalidator_xdai:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.xdai
     environment:
       - NODE_ENV=production

@@ -1,4 +1,3 @@
----
 version: '2.4'
 services:
   rabbit_amb:
@@ -34,7 +33,7 @@ services:
   bridge_request_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -47,7 +46,7 @@ services:
   bridge_affirmation_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -60,7 +59,7 @@ services:
   bridge_senderhome_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -73,7 +72,7 @@ services:
   bridge_senderforeign_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -86,7 +85,7 @@ services:
   bridge_shutdown_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -97,7 +96,7 @@ services:
   bridge_fcrvalidator_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.11.0
+    image: gnosischain/tokenbridge-oracle:v3.12.0
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
