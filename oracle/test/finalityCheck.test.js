@@ -171,6 +171,40 @@ describe('blockFinalityCheck', () => {
       expect(loggerStub.info.calledWith('Last finalized block: 123456 (from EL RPC URL 1)')).to.be.true
     })
 
+    it('should skip beacon URLs and use EL RPC directly after a full beacon failure', async () => {
+      sendGetStub.rejects(new Error('Beacon down'))
+      sendStub.resolves({ jsonrpc: '2.0', id: 1, result: { number: '0x1e240' } })
+
+      // First cycle: beacon is tried, all fail, EL RPC used.
+      const first = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(first).to.equal(123456)
+      expect(sendGetStub.calledOnce).to.be.true
+      expect(
+        loggerStub.info.calledWith(
+          'Beacon chain unreachable; preferring EL RPC for subsequent cycles (restart to re-probe beacon)'
+        )
+      ).to.be.true
+
+      // Second cycle: beacon is skipped entirely, EL RPC used directly.
+      const second = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(second).to.equal(123456)
+      expect(sendGetStub.calledOnce).to.be.true // still just the one call from the first cycle
+      expect(sendStub.calledTwice).to.be.true
+    })
+
+    it('should still try beacon when no EL RPC is configured, even after a beacon failure', async () => {
+      sendGetStub.onFirstCall().rejects(new Error('Beacon down'))
+      sendGetStub.onSecondCall().resolves({
+        data: { message: { body: { execution_payload: { block_number: '777' } } } }
+      })
+
+      // No EL RPC: the prefer-EL switch must not engage, so beacon is retried next cycle.
+      await checkLastFinalizedBlock(['https://beacon1.com'], []).catch(() => {})
+      const second = await checkLastFinalizedBlock(['https://beacon1.com'], [])
+      expect(second).to.equal(777)
+      expect(sendGetStub.calledTwice).to.be.true
+    })
+
     it('should try multiple EL RPC URLs on fallback', async () => {
       sendGetStub.rejects(new Error('Beacon down'))
       sendStub.onFirstCall().rejects(new Error('EL RPC 1 down'))

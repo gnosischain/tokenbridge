@@ -5,6 +5,9 @@ const logger = require('./services/logger')
 // Cache for the last successfully queried finalized block
 let cachedFinalizedBlock = null
 
+// Once every beacon URL fails in a cycle, prefer EL RPC for subsequent cycles
+let preferElRpc = false
+
 /// @param urls: an array of beacon chain urls
 /// @param elRpcUrls: an array of execution layer rpc urls (fallback)
 /// @dev get last finalized block and return the first valid block, throw error if can't find any
@@ -21,34 +24,53 @@ async function checkLastFinalizedBlock(urls, elRpcUrls) {
     requestTimeout: 30000
   }
 
-  // Try each beacon chain URL in order until one succeeds
-  for (let i = 0; i < urlArray.length; i++) {
-    const url = `${urlArray[i]}/eth/v2/beacon/blocks/finalized`
-    try {
-      logger.info(`Trying beacon chain URL ${i + 1}/${urlArray.length}: ${url}`)
-      const result = await sendGet(url, options)
+  const elUrls = elRpcUrls || []
 
-      const rawBlockNumber = result && result.data && result.data.message && result.data.message.body && result.data.message.body.execution_payload && result.data.message.body.execution_payload.block_number
-      if (rawBlockNumber) {
-        const blockNumber = Number(rawBlockNumber)
-        logger.info(`Last finalized block: ${blockNumber} (from beacon URL ${i + 1})`)
-        cachedFinalizedBlock = blockNumber
-        return blockNumber
-      } else {
-        logger.warn(`Empty or invalid response from beacon URL ${i + 1}: ${url}`)
+  // If a previous cycle already exhausted every beacon URL, skip them and use EL RPC directly
+  // (as long as EL RPC is configured). If no EL RPC is available we still fall through to the beacon loop below.
+  if (preferElRpc && elUrls.length > 0) {
+    logger.debug('Beacon chain previously failed; using EL RPC directly for this cycle')
+  } else {
+    // Try each beacon chain URL in order until one succeeds
+    for (let i = 0; i < urlArray.length; i++) {
+      const url = `${urlArray[i]}/eth/v2/beacon/blocks/finalized`
+      try {
+        logger.info(`Trying beacon chain URL ${i + 1}/${urlArray.length}: ${url}`)
+        const result = await sendGet(url, options)
+
+        const rawBlockNumber =
+          result &&
+          result.data &&
+          result.data.message &&
+          result.data.message.body &&
+          result.data.message.body.execution_payload &&
+          result.data.message.body.execution_payload.block_number
+        if (rawBlockNumber) {
+          const blockNumber = Number(rawBlockNumber)
+          logger.info(`Last finalized block: ${blockNumber} (from beacon URL ${i + 1})`)
+          cachedFinalizedBlock = blockNumber
+          return blockNumber
+        } else {
+          logger.warn(`Empty or invalid response from beacon URL ${i + 1}: ${url}`)
+          continue
+        }
+      } catch (e) {
+        logger.warn(`Failed to get finalized block from beacon URL ${i + 1} (${url}): ${e.message}`)
         continue
       }
-    } catch (e) {
-      logger.warn(`Failed to get finalized block from beacon URL ${i + 1} (${url}): ${e.message}`)
-      continue
+    }
+
+    // Every beacon URL failed this cycle: default to EL RPC for the upcoming cycles.
+    if (elUrls.length > 0) {
+      logger.info('All beacon chain URLs failed, falling back to EL RPC')
+      if (!preferElRpc) {
+        preferElRpc = true
+        logger.info('Beacon chain unreachable; preferring EL RPC for subsequent cycles (restart to re-probe beacon)')
+      }
     }
   }
 
   // Fallback: try EL RPC URLs with eth_getBlockByNumber("finalized")
-  const elUrls = elRpcUrls || []
-  if (elUrls.length > 0) {
-    logger.info('All beacon chain URLs failed, falling back to EL RPC')
-  }
 
   const payload = { jsonrpc: '2.0', id: 1, method: 'eth_getBlockByNumber', params: ['finalized', false] }
 
