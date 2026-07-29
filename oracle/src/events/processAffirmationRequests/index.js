@@ -10,10 +10,12 @@ const {
   AlreadyProcessedError,
   AlreadySignedError,
   InvalidValidatorError,
-  NotApprovedByHashiError,
+  // HASHI: disabled
+  // NotApprovedByHashiError,
   EstimateGasError
 } = require('../../utils/errors')
-const { getRetryQueue, deleteFromRetryList } = require('../../utils/sendToRetryQueue')
+// HASHI: disabled (retry queue only served the Hashi approval retry flow)
+// const { getRetryQueue, deleteFromRetryList } = require('../../utils/sendToRetryQueue')
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
 function processAffirmationRequestsBuilder(config) {
@@ -28,48 +30,49 @@ function processAffirmationRequestsBuilder(config) {
       validatorContract = await getValidatorContract(bridgeContract, web3)
     }
 
-    // process retryQueue
-    const retryQueue = await getRetryQueue('xdai')
-    if (retryQueue.length > 0) {
-      rootLogger.info(`Processing ${retryQueue.length} transaction from retry queue`)
-      for (const queueItem of retryQueue) {
-        let gasEstimate
-        const { transactionHash, recipient, value, nonce } = queueItem
-        const logger = rootLogger.child({
-          eventTransactionHash: transactionHash
-        })
-
-        logger.info(
-          { sender: recipient, value, nonce },
-          `Processing AffirmationRequest ${transactionHash} in retryQueue`
-        )
-
-        try {
-          gasEstimate = await estimateGas({
-            web3,
-            homeBridge: bridgeContract,
-            validatorContract,
-            recipient,
-            value,
-            nonce,
-            address: config.validatorAddress,
-            transactionHash
-          })
-          logger.debug({ gasEstimate }, 'Gas estimated')
-          await deleteFromRetryList(JSON.stringify({ bridge: 'xdai', transactionHash, recipient, value, nonce }))
-        } catch (e) {
-          logger.error(e)
-        }
-
-        const data = bridgeContract.methods.executeAffirmation(recipient, value, nonce).encodeABI()
-        txToSend.push({
-          data,
-          gasEstimate,
-          transactionReference: transactionHash,
-          to: config.home.bridgeAddress
-        })
-      }
-    }
+    // HASHI: disabled
+    // // process retryQueue
+    // const retryQueue = await getRetryQueue('xdai')
+    // if (retryQueue.length > 0) {
+    //   rootLogger.info(`Processing ${retryQueue.length} transaction from retry queue`)
+    //   for (const queueItem of retryQueue) {
+    //     let gasEstimate
+    //     const { transactionHash, recipient, value, nonce } = queueItem
+    //     const logger = rootLogger.child({
+    //       eventTransactionHash: transactionHash
+    //     })
+    //
+    //     logger.info(
+    //       { sender: recipient, value, nonce },
+    //       `Processing AffirmationRequest ${transactionHash} in retryQueue`
+    //     )
+    //
+    //     try {
+    //       gasEstimate = await estimateGas({
+    //         web3,
+    //         homeBridge: bridgeContract,
+    //         validatorContract,
+    //         recipient,
+    //         value,
+    //         nonce,
+    //         address: config.validatorAddress,
+    //         transactionHash
+    //       })
+    //       logger.debug({ gasEstimate }, 'Gas estimated')
+    //       await deleteFromRetryList(JSON.stringify({ bridge: 'xdai', transactionHash, recipient, value, nonce }))
+    //     } catch (e) {
+    //       logger.error(e)
+    //     }
+    //
+    //     const data = bridgeContract.methods.executeAffirmation(recipient, value, nonce).encodeABI()
+    //     txToSend.push({
+    //       data,
+    //       gasEstimate,
+    //       transactionReference: transactionHash,
+    //       to: config.home.bridgeAddress
+    //     })
+    //   }
+    // }
     rootLogger.debug(`Processing ${affirmationRequests.length} AffirmationRequest events`)
     const callbacks = affirmationRequests
       .map(affirmationRequest => async () => {
@@ -112,15 +115,18 @@ function processAffirmationRequestsBuilder(config) {
               `affirmationRequest ${affirmationRequest.transactionHash} was already processed by other validators`
             )
             return
-          } else if (e instanceof NotApprovedByHashiError) {
-            logger.info(
-              `tx with tx hash ${affirmationRequest.transactionHash} is not approved by Hashi, wait for retry`
-            )
-            return
+            // HASHI: disabled
+            // } else if (e instanceof NotApprovedByHashiError) {
+            //   logger.info(
+            //     `tx with tx hash ${affirmationRequest.transactionHash} is not approved by Hashi, wait for retry`
+            //   )
+            //   return
           } else if (e instanceof EstimateGasError) {
             logger.error(
               e,
-              `Gas estimation failed for unknown reason, skipping affirmationRequest ${affirmationRequest.transactionHash}`
+              `Gas estimation failed for unknown reason, skipping affirmationRequest ${
+                affirmationRequest.transactionHash
+              }`
             )
             return
           } else {

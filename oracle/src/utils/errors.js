@@ -2,7 +2,8 @@ class AlreadyProcessedError extends Error {}
 class AlreadySignedError extends Error {}
 class IncompatibleContractError extends Error {}
 class InvalidValidatorError extends Error {}
-class NotApprovedByHashiError extends Error {}
+// HASHI: disabled
+// class NotApprovedByHashiError extends Error {}
 class EstimateGasError extends Error {}
 
 module.exports = {
@@ -10,6 +11,7 @@ module.exports = {
   AlreadySignedError,
   IncompatibleContractError,
   InvalidValidatorError,
-  NotApprovedByHashiError,
+  // HASHI: disabled
+  // NotApprovedByHashiError,
   EstimateGasError
 }
