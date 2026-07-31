@@ -5,6 +5,7 @@ const { HttpListProvider } = require('./HttpListProvider')
 const { SafeEthLogsProvider } = require('./SafeEthLogsProvider')
 const { RedundantHttpListProvider } = require('./RedundantHttpListProvider')
 const { RETRY_CONFIG } = require('../utils/constants')
+const { rpcRequestTimeout } = require('../utils/configParams')
 
 const {
   COMMON_HOME_RPC_URL,
@@ -12,10 +13,7 @@ const {
   ORACLE_SIDE_RPC_URL,
   ORACLE_FOREIGN_ARCHIVE_RPC_URL,
   ORACLE_MEV_FOREIGN_FLASHBOTS_RPC_URL,
-  ORACLE_MEV_FOREIGN_FLASHBOTS_AUTH_SIGNING_KEY,
-  ORACLE_RPC_REQUEST_TIMEOUT,
-  ORACLE_HOME_RPC_POLLING_INTERVAL,
-  ORACLE_FOREIGN_RPC_POLLING_INTERVAL
+  ORACLE_MEV_FOREIGN_FLASHBOTS_AUTH_SIGNING_KEY
 } = process.env
 
 if (!COMMON_HOME_RPC_URL) {
@@ -28,17 +26,13 @@ if (!COMMON_FOREIGN_RPC_URL) {
 const homeUrls = COMMON_HOME_RPC_URL.split(' ').filter(url => url.length > 0)
 const foreignUrls = COMMON_FOREIGN_RPC_URL.split(' ').filter(url => url.length > 0)
 
-const homeDefaultTimeout = parseInt(ORACLE_HOME_RPC_POLLING_INTERVAL, 10) * 2
-const foreignDefaultTimeout = parseInt(ORACLE_FOREIGN_RPC_POLLING_INTERVAL, 10) * 2
-const configuredTimeout = parseInt(ORACLE_RPC_REQUEST_TIMEOUT, 10)
-
 const homeOptions = {
-  requestTimeout: configuredTimeout || homeDefaultTimeout,
+  requestTimeout: rpcRequestTimeout,
   retry: RETRY_CONFIG
 }
 
 const foreignOptions = {
-  requestTimeout: configuredTimeout || foreignDefaultTimeout,
+  requestTimeout: rpcRequestTimeout,
   retry: RETRY_CONFIG
 }
 
@@ -52,7 +46,7 @@ let web3ForeignArchive = null
 if (ORACLE_FOREIGN_ARCHIVE_RPC_URL) {
   const archiveUrls = ORACLE_FOREIGN_ARCHIVE_RPC_URL.split(' ').filter(url => url.length > 0)
   const options = {
-    requestTimeout: configuredTimeout || 2000,
+    requestTimeout: rpcRequestTimeout,
     retry: RETRY_CONFIG
   }
 
@@ -64,7 +58,7 @@ let web3Side = null
 if (ORACLE_SIDE_RPC_URL) {
   const sideUrls = ORACLE_SIDE_RPC_URL.split(' ').filter(url => url.length > 0)
   const sideOptions = {
-    requestTimeout: configuredTimeout || 2000,
+    requestTimeout: rpcRequestTimeout,
     retry: RETRY_CONFIG
   }
 
@@ -116,5 +110,11 @@ module.exports = {
   web3ForeignRedundant,
   web3HomeFallback,
   web3ForeignFallback,
-  getFlashbotsProvider
+  getFlashbotsProvider,
+  // exported so that base.config can size maxProcessingTime against the real url count and
+  // timeout instead of a hardcoded guess - adding a third RPC url widens the watchdog automatically
+  homeUrls,
+  foreignUrls,
+  homeOptions,
+  foreignOptions
 }

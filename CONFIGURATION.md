@@ -20,12 +20,25 @@ COMMON_FOREIGN_GAS_PRICE_FACTOR | A value that will multiply the gas price of th
 
 ## Oracle configuration
 
+> **Parameter validation.** Every numeric oracle parameter is parsed strictly and range-checked at
+> startup. A value that is not an integer, or that falls outside the documented range, is replaced
+> by the code default and reported with a `[config]` warning — the process never starts with a
+> value that cannot work. Note that this is stricter than the old `parseInt` behaviour: `1e5` now
+> means `100000` (it previously meant `1`), and `4000abc` is now rejected instead of silently
+> becoming `4000`.
+>
+> Some parameters constrain each other (`ORACLE_RPC_REQUEST_TIMEOUT`, the RPC url count and
+> `ORACLE_MAX_PROCESSING_TIME`; `*_EVENTS_REPROCESSING_BATCH_SIZE` and `*_RPC_BLOCK_POLLING_LIMIT`).
+> Those are reconciled after parsing, so a combination that is individually valid but jointly
+> incoherent is corrected rather than left to fail at runtime. The full effective parameter set is
+> printed once at startup under `[config] resolved parameters`.
+
 name | description | value
 --- | --- | ---
 ORACLE_BRIDGE_MODE | The bridge mode. The bridge starts listening to a different set of events based on this parameter. | ERC_TO_NATIVE / ARBITRARY_MESSAGE
 ORACLE_ALLOW_HTTP_FOR_RPC | **Only use in test environments - must be omitted in production environments.**. If this parameter is specified and set to `yes`, RPC URLs can be specified in form of HTTP links. A warning that the connection is insecure will be written to the logs. | `yes` / `no`
-ORACLE_HOME_RPC_POLLING_INTERVAL | The interval in milliseconds used to request the RPC node in the Home network for new blocks. The interval should match the average production time for a new block. | integer
-ORACLE_FOREIGN_RPC_POLLING_INTERVAL | The interval in milliseconds used to request the RPC node in the Foreign network for new blocks. The interval should match the average production time for a new block. | integer
+ORACLE_HOME_RPC_POLLING_INTERVAL | The interval in milliseconds used to request the RPC node in the Home network for new blocks. The interval should match the average production time for a new block. Must be within `[1000, 60000]`; defaults to `5000` if unset or out of range. | integer
+ORACLE_FOREIGN_RPC_POLLING_INTERVAL | The interval in milliseconds used to request the RPC node in the Foreign network for new blocks. The interval should match the average production time for a new block. Must be within `[1000, 60000]`; defaults to `5000` if unset or out of range. | integer
 ORACLE_HOME_GAS_PRICE_UPDATE_INTERVAL | An interval in milliseconds used to get the updated gas price value either from the oracle or from the Home Bridge contract. | integer
 ORACLE_FOREIGN_GAS_PRICE_UPDATE_INTERVAL | The interval in milliseconds used to get the updated gas price value either from the oracle or from the Foreign Bridge contract. | integer
 ORACLE_QUEUE_URL | RabbitMQ URL used by watchers and senders to communicate to the message queue. Typically set to: `amqp://127.0.0.1`. | local URL
@@ -33,7 +46,7 @@ ORACLE_REDIS_URL | Redis DB URL used by watchers and senders to communicate to t
 ORACLE_HOME_START_BLOCK | The block number in the Home network used to start watching for events when the bridge instance is run for the first time. Usually this is the same block where the Home Bridge contract is deployed. If a new validator instance is being deployed for an existing set of validators, the block number could be the latest block in the chain. | integer
 ORACLE_FOREIGN_START_BLOCK | The block number in the Foreign network used to start watching for events when the bridge instance runs for the first time. Usually this is the same block where the Foreign Bridge contract was deployed to. If a new validator instance is being deployed for an existing set of validators, the block number could be the latest block in the chain. | integer
 ORACLE_LOG_LEVEL | Set the level of details in the logs. | `trace` / `debug` / `info` / `warn` / `error` / `fatal`
-ORACLE_MAX_PROCESSING_TIME | The workers processes will be killed if this amount of time (in milliseconds) is elapsed before they finish processing. It is recommended to set this value to 4 times the value of the longest polling time (set with the `HOME_POLLING_INTERVAL` and `FOREIGN_POLLING_INTERVAL` variables). To disable this, set the time to 0. | integer
+ORACLE_MAX_PROCESSING_TIME | The workers processes will be killed if this amount of time (in milliseconds) is elapsed before they finish processing. **Leave unset** — it is derived from the worst-case RPC budget: `3 × ((RETRY_CONFIG.retries + 1) × urlCount × ORACLE_RPC_REQUEST_TIMEOUT + backoff)`, which is what actually bounds a cycle. A value below that budget is raised automatically (with a warning), because a smaller watchdog kills the process during ordinary RPC retries and — since a restart reloads the same `lastProcessedBlock` — produces a crash loop. To disable the watchdog entirely, set the time to 0. | integer
 ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY | The private key of the bridge validator used to sign confirmations before sending transactions to the bridge contracts. The validator account is calculated automatically from the private key. Every bridge instance (set of watchers and senders) must have its own unique private key. The specified private key is used to sign transactions on both sides of the bridge. | hexidecimal without "0x"
 ORACLE_VALIDATOR_ADDRESS | The public address of the bridge validator | hexidecimal with "0x"
 ORACLE_TX_REDUNDANCY | If set to `true`, instructs oracle to send `eth_sendRawTransaction` requests through all available RPC urls defined in `COMMON_HOME_RPC_URL` and `COMMON_FOREIGN_RPC_URL` variables instead of using first available one
@@ -41,7 +54,7 @@ ORACLE_HOME_TO_FOREIGN_ALLOWANCE_LIST | Filename with a list of addresses, separ
 ORACLE_HOME_TO_FOREIGN_BLOCK_LIST | Filename with a list of addresses, separated by newlines. If set, determines the blocked set of accounts whose requests will not be automatically processed by the CollectedSignatures watcher. Has a lower priority than the `ORACLE_HOME_TO_FOREIGN_ALLOWANCE_LIST` | string
 ORACLE_HOME_TO_FOREIGN_CHECK_SENDER | If set to `true`, instructs the oracle to do an extra check for transaction origin in the block/allowance list. `false` by default. | `true` / `false`
 ORACLE_ALWAYS_RELAY_SIGNATURES | If set to `true`, the oracle will always relay signatures even if it was not the last who finilized the signatures collecting process. The default is `false`. | `true` / `false`
-ORACLE_RPC_REQUEST_TIMEOUT | Timeout in milliseconds for a single RPC request. Default value is `ORACLE_*_RPC_POLLING_INTERVAL * 2`. | integer
+ORACLE_RPC_REQUEST_TIMEOUT | Timeout in milliseconds for a single RPC request. Must be within `[1000, 60000]`; defaults to `10000`. It has to cover the heaviest call — `eth_getLogs` over `*_RPC_BLOCK_POLLING_LIMIT` blocks — so it is no longer derived from the polling interval. Raising it also raises the derived `ORACLE_MAX_PROCESSING_TIME`. | integer
 ORACLE_HOME_TX_RESEND_INTERVAL | Interval in milliseconds for automatic resending of stuck transactions for Home sender service. Defaults to 20 minutes. | integer  
 ORACLE_FOREIGN_TX_RESEND_INTERVAL | Interval in milliseconds for automatic resending of stuck transactions for Foreign sender service. Defaults to 20 minutes. | integer  
 ORACLE_SHUTDOWN_SERVICE_URL | Optional external URL to some other service/monitor/configuration manager that controls the remote shutdown process. GET request should return `application/json` message with the following schema: `{ shutdown: true/false }`. | URL
@@ -50,17 +63,17 @@ ORACLE_SIDE_RPC_URL | Optional HTTPS URL(s) for communication with the external 
 ORACLE_FOREIGN_ARCHIVE_RPC_URL | Optional HTTPS URL(s) for communication with the archive nodes on the foreign network. Only used in AMB bridge mode for async information request processing. Several URLs can be specified, delimited by spaces. If the connection to one of these nodes is lost the next URL is used for connection. | URL(s)
 ORACLE_SHUTDOWN_CONTRACT_ADDRESS | Optional contract address in the side chain accessible through `ORACLE_SIDE_RPC_URL`, where the method passed in `ORACLE_SHUTDOWN_CONTRACT_METHOD` is implemented. | `address`
 ORACLE_SHUTDOWN_CONTRACT_METHOD | Method signature to be used in the side chain to identify the current shutdown status. Method should return boolean. Default value is `isShutdown()`. | `function signature`
-ORACLE_FOREIGN_RPC_BLOCK_POLLING_LIMIT | Max length for the block range used in `eth_getLogs` requests for polling contract events for the Foreign chain. Infinite, if not provided. | `integer`
-ORACLE_HOME_RPC_BLOCK_POLLING_LIMIT | Max length for the block range used in `eth_getLogs` requests for polling contract events for the Home chain. Infinite, if not provided. | `integer`
+ORACLE_FOREIGN_RPC_BLOCK_POLLING_LIMIT | Max length for the block range used in `eth_getLogs` requests for polling contract events for the Foreign chain. Must be within `[50, 100000]`; defaults to `4000` if unset or out of range. | `integer`
+ORACLE_HOME_RPC_BLOCK_POLLING_LIMIT | Max length for the block range used in `eth_getLogs` requests for polling contract events for the Home chain. Must be within `[50, 100000]`; defaults to `4000` if unset or out of range. | `integer`
 ORACLE_JSONRPC_ERROR_CODES | Override default JSON rpc error codes that can trigger RPC fallback to the next URL from the list (or a retry in case of a single RPC URL). Default is `-32603,-32002,-32005`. Should be a comma-separated list of negative integers. | `string`
 ORACLE_HOME_EVENTS_REPROCESSING | If set to `true`, home events happened in the past will be refetched and processed once again, to ensure that nothing was missed on the first pass. | `bool`
-ORACLE_HOME_EVENTS_REPROCESSING_BATCH_SIZE | Batch size for one `eth_getLogs` request when reprocessing old logs in the home chain. Defaults to `1000` | `integer`
+ORACLE_HOME_EVENTS_REPROCESSING_BATCH_SIZE | Batch size for one `eth_getLogs` request when reprocessing old logs in the home chain. Defaults to `1000`. Clamped to `min(ORACLE_HOME_RPC_BLOCK_POLLING_LIMIT, MAX_HISTORY_BLOCK_TO_REPROCESS - blockDelay - 1)` — reprocessing issues its own `eth_getLogs` range, so an oversized batch trips the node's range/result cap independently of the polling limit | `integer`
 ORACLE_HOME_EVENTS_REPROCESSING_BLOCK_DELAY | Block confirmations number, after which old logs are being reprocessed in the home chain. Defaults to `500` | `integer`
-ORACLE_HOME_RPC_SYNC_STATE_CHECK_INTERVAL | Interval for checking JSON RPC sync state, by requesting the latest block number. Oracle will switch to the fallback JSON RPC in case sync process is stuck | `integer`
+ORACLE_HOME_RPC_SYNC_STATE_CHECK_INTERVAL | Interval for checking JSON RPC sync state, by requesting the latest block number. Oracle will switch to the fallback JSON RPC in case sync process is stuck. Must be within `[15000, 600000]` (or `0` to disable); defaults to `60000`. Below roughly twice the block time the checker keeps seeing "no new block" and flaps between RPC urls. | `integer`
 ORACLE_FOREIGN_EVENTS_REPROCESSING  | If set to `true`, foreign events happened in the past will be refetched and processed once again, to ensure that nothing was missed on the first pass. | `bool`
-ORACLE_FOREIGN_EVENTS_REPROCESSING_BATCH_SIZE | Batch size for one `eth_getLogs` request when reprocessing old logs in the foreign chain. Defaults to `500` | `integer`
+ORACLE_FOREIGN_EVENTS_REPROCESSING_BATCH_SIZE | Batch size for one `eth_getLogs` request when reprocessing old logs in the foreign chain. Defaults to `500`. Clamped to `min(ORACLE_FOREIGN_RPC_BLOCK_POLLING_LIMIT, MAX_HISTORY_BLOCK_TO_REPROCESS - blockDelay - 1)` — reprocessing issues its own `eth_getLogs` range, so an oversized batch trips the node's range/result cap independently of the polling limit | `integer`
 ORACLE_FOREIGN_EVENTS_REPROCESSING_BLOCK_DELAY | Block confirmations number, after which old logs are being reprocessed in the foreign chain. Defaults to `250` | `integer`
-ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL | Interval for checking JSON RPC sync state, by requesting the latest block number. Oracle will switch to the fallback JSON RPC in case sync process is stuck | `integer`
+ORACLE_FOREIGN_RPC_SYNC_STATE_CHECK_INTERVAL | Interval for checking JSON RPC sync state, by requesting the latest block number. Oracle will switch to the fallback JSON RPC in case sync process is stuck. Must be within `[15000, 600000]` (or `0` to disable); defaults to `60000`. Below roughly twice the block time the checker keeps seeing "no new block" and flaps between RPC urls. | `integer`
 
 
 ## Monitor configuration

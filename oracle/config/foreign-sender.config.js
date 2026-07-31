@@ -1,6 +1,7 @@
 const baseConfig = require('./base.config')
 
 const { DEFAULT_TRANSACTION_RESEND_INTERVAL } = require('../src/utils/constants')
+const { intParam } = require('../src/utils/configParams')
 
 const { ORACLE_FOREIGN_TX_RESEND_INTERVAL } = process.env
 
@@ -10,5 +11,8 @@ module.exports = {
   queue: 'foreign-prioritized',
   id: 'foreign',
   name: 'sender-foreign',
-  resendInterval: parseInt(ORACLE_FOREIGN_TX_RESEND_INTERVAL, 10) || DEFAULT_TRANSACTION_RESEND_INTERVAL
+  resendInterval: intParam('ORACLE_FOREIGN_TX_RESEND_INTERVAL', ORACLE_FOREIGN_TX_RESEND_INTERVAL, {
+    def: DEFAULT_TRANSACTION_RESEND_INTERVAL,
+    min: 1000
+  })
 }
