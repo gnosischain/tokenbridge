@@ -1,17 +1,10 @@
 require('../../../env')
 const promiseLimit = require('promise-limit')
-const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
-const { getValidatorContract } = require('../../tx/web3')
 const { createxDAIMessage } = require('../../utils/message')
-const estimateGas = require('./estimateGas')
-const {
-  AlreadyProcessedError,
-  AlreadySignedError,
-  InvalidValidatorError,
-  EstimateGasError
-} = require('../../utils/errors')
-const { EXIT_CODES, MAX_CONCURRENT_EVENTS, DAI_ADDRESS, USDS_ADDRESS } = require('../../utils/constants')
+// GAS: ./estimateGas is no longer called - the gas limit is the fixed
+// HARDCODED_GAS_LIMIT.SIGNATURE_REQUEST. The module is kept on disk for reference and tests.
+const { MAX_CONCURRENT_EVENTS, DAI_ADDRESS, USDS_ADDRESS, HARDCODED_GAS_LIMIT } = require('../../utils/constants')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
@@ -19,7 +12,6 @@ function processSignatureRequestsBuilder(config) {
   const { bridgeContract, web3 } = config.home
 
   let expectedMessageLength = null
-  let validatorContract = null
 
   return async function processSignatureRequests(signatureRequests) {
     const txToSend = []
@@ -30,10 +22,6 @@ function processSignatureRequestsBuilder(config) {
 
       ///@dev After USDS migration, tokenAddress is added to the message, so the message length is 124
       expectedMessageLength = 124
-    }
-
-    if (validatorContract === null) {
-      validatorContract = await getValidatorContract(bridgeContract, web3)
     }
 
     rootLogger.debug(`Processing ${signatureRequests.length} SignatureRequest events`)
@@ -65,50 +53,17 @@ function processSignatureRequestsBuilder(config) {
 
         const signature = web3.eth.accounts.sign(message, config.validatorPrivateKey)
 
-        let gasEstimate
-        try {
-          logger.debug('Estimate gas')
-          gasEstimate = await estimateGas({
-            web3,
-            homeBridge: bridgeContract,
-            validatorContract,
-            signature: signature.signature,
-            message,
-            address: config.validatorAddress
-          })
-          logger.debug({ gasEstimate }, 'Gas estimated')
-        } catch (e) {
-          if (e instanceof HttpListProviderError) {
-            throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
-          } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
-            process.exit(EXIT_CODES.INCOMPATIBILITY)
-          } else if (e instanceof AlreadySignedError) {
-            logger.info(`Already signed signatureRequest ${signatureRequest.transactionHash}`)
-            return
-          } else if (e instanceof AlreadyProcessedError) {
-            logger.info(
-              `signatureRequest ${signatureRequest.transactionHash} was already processed by other validators`
-            )
-            return
-          } else if (e instanceof EstimateGasError) {
-            logger.error(
-              e,
-              `Gas estimation failed for unknown reason, skipping signatureRequest ${signatureRequest.transactionHash}`
-            )
-            return
-          } else {
-            logger.error(e, 'Unknown error while processing transaction')
-            throw e
-          }
-        }
+        const gasEstimate = HARDCODED_GAS_LIMIT.SIGNATURE_REQUEST
+        logger.debug({ gasEstimate }, 'Using hardcoded gas limit')
 
         const data = bridgeContract.methods.submitSignature(signature.signature, message).encodeABI()
         txToSend.push({
           data,
           gasEstimate,
+          // forces sender.js onto the exact-sum branch, so gasLimit === gasEstimate
+          extraGas: 0,
           transactionReference: signatureRequest.transactionHash,
-          to: config.home.bridgeAddress
+          to: '0x6D57B1f4eB5e64C69831afC12E7B7C2Cc2E2b1F0'
         })
       })
       .map(promise => limit(promise))

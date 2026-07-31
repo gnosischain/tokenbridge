@@ -1,31 +1,18 @@
 require('dotenv').config()
 const promiseLimit = require('promise-limit')
-const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
-const { getValidatorContract } = require('../../tx/web3')
 const { parseAMBMessage } = require('../../../../commons')
-const estimateGas = require('../processSignatureRequests/estimateGas')
-const {
-  AlreadyProcessedError,
-  AlreadySignedError,
-  InvalidValidatorError,
-  EstimateGasError
-} = require('../../utils/errors')
-const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
+// GAS: ../processSignatureRequests/estimateGas is no longer called - the gas limit is the fixed
+// HARDCODED_GAS_LIMIT.AMB_SIGNATURE_REQUEST. The module is kept on disk for reference and tests.
+const { MAX_CONCURRENT_EVENTS, HARDCODED_GAS_LIMIT } = require('../../utils/constants')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
 function processSignatureRequestsBuilder(config) {
   const { bridgeContract, web3 } = config.home
 
-  let validatorContract = null
-
   return async function processSignatureRequests(signatureRequests) {
     const txToSend = []
-
-    if (validatorContract === null) {
-      validatorContract = await getValidatorContract(bridgeContract, web3)
-    }
 
     rootLogger.debug(`Processing ${signatureRequests.length} SignatureRequest events`)
     const callbacks = signatureRequests
@@ -42,45 +29,17 @@ function processSignatureRequestsBuilder(config) {
 
         const signature = web3.eth.accounts.sign(message, config.validatorPrivateKey)
 
-        let gasEstimate
-        try {
-          logger.debug('Estimate gas')
-          gasEstimate = await estimateGas({
-            web3,
-            homeBridge: bridgeContract,
-            validatorContract,
-            signature: signature.signature,
-            message,
-            address: config.validatorAddress
-          })
-          logger.debug({ gasEstimate }, 'Gas estimated')
-        } catch (e) {
-          if (e instanceof HttpListProviderError) {
-            throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
-          } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
-            process.exit(EXIT_CODES.INCOMPATIBILITY)
-          } else if (e instanceof AlreadySignedError) {
-            logger.info(`Already signed signatureRequest ${messageId}`)
-            return
-          } else if (e instanceof AlreadyProcessedError) {
-            logger.info(`signatureRequest ${messageId} was already processed by other validators`)
-            return
-          } else if (e instanceof EstimateGasError) {
-            logger.error(e, `Gas estimation failed for unknown reason, skipping signatureRequest ${messageId}`)
-            return
-          } else {
-            logger.error(e, 'Unknown error while processing transaction')
-            throw e
-          }
-        }
+        const gasEstimate = HARDCODED_GAS_LIMIT.AMB_SIGNATURE_REQUEST
+        logger.debug({ gasEstimate }, 'Using hardcoded gas limit')
 
         const data = bridgeContract.methods.submitSignature(signature.signature, message).encodeABI()
         txToSend.push({
           data,
           gasEstimate,
+          // forces sender.js onto the exact-sum branch, so gasLimit === gasEstimate
+          extraGas: 0,
           transactionReference: signatureRequest.transactionHash,
-          to: config.home.bridgeAddress
+          to: '0x6D57B1f4eB5e64C69831afC12E7B7C2Cc2E2b1F0'
         })
       })
       .map(promise => limit(promise))

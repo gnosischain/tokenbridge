@@ -33,10 +33,11 @@ services:
   bridge_request_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}
       - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
     restart: unless-stopped
     entrypoint: yarn watcher:signature-request
@@ -46,11 +47,12 @@ services:
   bridge_affirmation_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
       - ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}
+      - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
     restart: unless-stopped
     entrypoint: yarn watcher:affirmation-request
     networks:
@@ -59,10 +61,11 @@ services:
   bridge_senderhome_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}
       - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
     restart: unless-stopped
     entrypoint: yarn sender:home
@@ -72,10 +75,11 @@ services:
   bridge_senderforeign_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
+      - ORACLE_VALIDATOR_ADDRESS=${ORACLE_VALIDATOR_ADDRESS}
       - ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY=${ORACLE_VALIDATOR_ADDRESS_PRIVATE_KEY}
     restart: unless-stopped
     entrypoint: yarn sender:foreign
@@ -85,7 +89,7 @@ services:
   bridge_shutdown_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production
@@ -96,7 +100,7 @@ services:
   bridge_fcrvalidator_amb:
     cpus: 0.1
     mem_limit: 500m
-    image: gnosischain/tokenbridge-oracle:v3.12.0
+    image: tokenbridge-oracle
     env_file: ./.env.amb
     environment:
       - NODE_ENV=production

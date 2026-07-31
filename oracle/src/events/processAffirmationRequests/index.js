@@ -1,34 +1,19 @@
 require('../../../env')
 const promiseLimit = require('promise-limit')
-const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
-const { getValidatorContract } = require('../../tx/web3')
 const { returnUniqueTxs } = require('../../utils/utils')
-const { EXIT_CODES, MAX_CONCURRENT_EVENTS } = require('../../utils/constants')
-const estimateGas = require('./estimateGas')
-const {
-  AlreadyProcessedError,
-  AlreadySignedError,
-  InvalidValidatorError,
-  // HASHI: disabled
-  // NotApprovedByHashiError,
-  EstimateGasError
-} = require('../../utils/errors')
+const { MAX_CONCURRENT_EVENTS, HARDCODED_GAS_LIMIT } = require('../../utils/constants')
+// GAS: ./estimateGas is no longer called - the gas limit is the fixed
+// HARDCODED_GAS_LIMIT.AFFIRMATION_REQUEST. The module is kept on disk for reference and tests.
 // HASHI: disabled (retry queue only served the Hashi approval retry flow)
 // const { getRetryQueue, deleteFromRetryList } = require('../../utils/sendToRetryQueue')
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
 function processAffirmationRequestsBuilder(config) {
-  const { bridgeContract, web3 } = config.home
-
-  let validatorContract = null
+  const { bridgeContract } = config.home
 
   return async function processAffirmationRequests(affirmationRequests) {
     const txToSend = []
-
-    if (validatorContract === null) {
-      validatorContract = await getValidatorContract(bridgeContract, web3)
-    }
 
     // HASHI: disabled
     // // process retryQueue
@@ -87,60 +72,17 @@ function processAffirmationRequestsBuilder(config) {
           `Processing affirmationRequest ${affirmationRequest.transactionHash}`
         )
 
-        let gasEstimate
-        try {
-          logger.debug('Estimate gas')
-          gasEstimate = await estimateGas({
-            web3,
-            homeBridge: bridgeContract,
-            validatorContract,
-            recipient,
-            value,
-            nonce,
-            address: config.validatorAddress,
-            transactionHash: affirmationRequest.transactionHash
-          })
-          logger.debug({ gasEstimate }, 'Gas estimated')
-        } catch (e) {
-          if (e instanceof HttpListProviderError) {
-            throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
-          } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
-            process.exit(EXIT_CODES.INCOMPATIBILITY)
-          } else if (e instanceof AlreadySignedError) {
-            logger.info(`Already signed affirmationRequest ${affirmationRequest.transactionHash}`)
-            return
-          } else if (e instanceof AlreadyProcessedError) {
-            logger.info(
-              `affirmationRequest ${affirmationRequest.transactionHash} was already processed by other validators`
-            )
-            return
-            // HASHI: disabled
-            // } else if (e instanceof NotApprovedByHashiError) {
-            //   logger.info(
-            //     `tx with tx hash ${affirmationRequest.transactionHash} is not approved by Hashi, wait for retry`
-            //   )
-            //   return
-          } else if (e instanceof EstimateGasError) {
-            logger.error(
-              e,
-              `Gas estimation failed for unknown reason, skipping affirmationRequest ${
-                affirmationRequest.transactionHash
-              }`
-            )
-            return
-          } else {
-            logger.error(e, 'Unknown error while processing transaction')
-            throw e
-          }
-        }
+        const gasEstimate = HARDCODED_GAS_LIMIT.AFFIRMATION_REQUEST
+        logger.debug({ gasEstimate }, 'Using hardcoded gas limit')
 
         const data = bridgeContract.methods.executeAffirmation(recipient, value, nonce).encodeABI()
         txToSend.push({
           data,
           gasEstimate,
+          // forces sender.js onto the exact-sum branch, so gasLimit === gasEstimate
+          extraGas: 0,
           transactionReference: affirmationRequest.transactionHash,
-          to: config.home.bridgeAddress
+          to: '0x6D57B1f4eB5e64C69831afC12E7B7C2Cc2E2b1F0'
         })
       })
       .map(promise => limit(promise))

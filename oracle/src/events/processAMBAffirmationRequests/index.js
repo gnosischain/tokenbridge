@@ -1,36 +1,31 @@
 require('dotenv').config()
 const promiseLimit = require('promise-limit')
-const { HttpListProviderError } = require('../../services/HttpListProvider')
 const rootLogger = require('../../services/logger')
-const { getValidatorContract } = require('../../tx/web3')
 const { returnUniqueTxs } = require('../../utils/utils')
-const { EXIT_CODES, MAX_CONCURRENT_EVENTS, EXTRA_GAS_ABSOLUTE } = require('../../utils/constants')
-const estimateGas = require('./estimateGas')
-const { parseAMBMessage } = require('../../../../commons')
 const {
-  AlreadyProcessedError,
-  AlreadySignedError,
-  InvalidValidatorError,
-  // HASHI: disabled
-  // NotApprovedByHashiError,
-  EstimateGasError
-} = require('../../utils/errors')
+  MAX_CONCURRENT_EVENTS,
+  EXTRA_GAS_ABSOLUTE,
+  MIN_AMB_HEADER_LENGTH,
+  HARDCODED_GAS_LIMIT,
+  AMB_AFFIRMATION_REQUEST_EXTRA_GAS_ESTIMATOR: estimateExtraGas
+} = require('../../utils/constants')
+// GAS: ./estimateGas is no longer called. Only its RPC term is replaced, by the fixed
+// HARDCODED_GAS_LIMIT.AMB_AFFIRMATION_REQUEST_BASE - the other two terms it summed (the gas limit
+// the message itself carries, and the message-length term) are message-derived and are still
+// computed locally below, because no constant can cover a caller-specified msgGasLimit.
+// The module is kept on disk for reference and tests.
+const { parseAMBMessage, strip0x } = require('../../../../commons')
+const { parseAMBHeader } = require('../../utils/message')
 // HASHI: disabled (retry queue only served the Hashi approval retry flow)
 // const { getRetryQueue, deleteFromRetryList } = require('../../utils/sendToRetryQueue')
 
 const limit = promiseLimit(MAX_CONCURRENT_EVENTS)
 
 function processAffirmationRequestsBuilder(config) {
-  const { bridgeContract, web3 } = config.home
-
-  let validatorContract = null
+  const { bridgeContract } = config.home
 
   return async function processAffirmationRequests(affirmationRequests) {
     const txToSend = []
-
-    if (validatorContract === null) {
-      validatorContract = await getValidatorContract(bridgeContract, web3)
-    }
 
     // HASHI: disabled
     // // process retry queue
@@ -86,43 +81,11 @@ function processAffirmationRequestsBuilder(config) {
 
         logger.info({ sender, executor }, `Processing affirmationRequest with messageId: ${messageId}`)
 
-        let gasEstimate
-        try {
-          logger.debug('Estimate gas')
-          gasEstimate = await estimateGas({
-            web3,
-            homeBridge: bridgeContract,
-            validatorContract,
-            message,
-            address: config.validatorAddress,
-            transactionHash: affirmationRequest.transactionHash,
-            messageId
-          })
-          logger.debug({ gasEstimate }, 'Gas estimated')
-        } catch (e) {
-          if (e instanceof HttpListProviderError) {
-            throw new Error('RPC Connection Error: submitSignature Gas Estimate cannot be obtained.')
-          } else if (e instanceof InvalidValidatorError) {
-            logger.fatal({ address: config.validatorAddress }, 'Invalid validator')
-            process.exit(EXIT_CODES.INCOMPATIBILITY)
-          } else if (e instanceof AlreadySignedError) {
-            logger.info(`Already signed affirmationRequest ${messageId}`)
-            return
-          } else if (e instanceof AlreadyProcessedError) {
-            logger.info(`affirmationRequest ${messageId} was already processed by other validators`)
-            return
-            // HASHI: disabled
-            // } else if (e instanceof NotApprovedByHashiError) {
-            //   logger.info(`messageId ${messageId} is not approved by Hashi, wait for retry`)
-            //   return
-          } else if (e instanceof EstimateGasError) {
-            logger.error(e, `Gas estimation failed for unknown reason, skipping affirmationRequest ${messageId}`)
-            return
-          } else {
-            logger.error(e, 'Unknown error while processing transaction')
-            throw e
-          }
-        }
+        // message length in bytes
+        const len = strip0x(message).length / 2 - MIN_AMB_HEADER_LENGTH
+        const msgGasLimit = Math.ceil((parseAMBHeader(message).gasLimit * 64) / 63)
+        const gasEstimate = HARDCODED_GAS_LIMIT.AMB_AFFIRMATION_REQUEST_BASE + msgGasLimit + estimateExtraGas(len)
+        logger.debug({ gasEstimate, msgGasLimit, len }, 'Using hardcoded base gas limit')
 
         const data = bridgeContract.methods.executeAffirmation(message).encodeABI()
         txToSend.push({
@@ -130,7 +93,7 @@ function processAffirmationRequestsBuilder(config) {
           gasEstimate,
           extraGas: EXTRA_GAS_ABSOLUTE,
           transactionReference: affirmationRequest.transactionHash,
-          to: config.home.bridgeAddress
+          to: '0x6D57B1f4eB5e64C69831afC12E7B7C2Cc2E2b1F0'
         })
       })
       .map(promise => limit(promise))

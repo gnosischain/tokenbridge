@@ -4,6 +4,25 @@ module.exports = {
   AMB_AFFIRMATION_REQUEST_EXTRA_GAS_ESTIMATOR: len => Math.floor(0.0035 * len ** 2 + 40 * len),
   MIN_AMB_HEADER_LENGTH: 32 + 20 + 20 + 4 + 2 + 1 + 2,
   MAX_GAS_LIMIT: 10000000,
+  // Fixed gas limits used in place of an eth_estimateGas call. Derived from observed on-chain
+  // `gas_used` on the Gnosis home bridges, sampled 2026-07-31:
+  //   erc-to-native 0x7301CFA0e1756B71869E93d4e4Dca5c7d0eb0AA6 (750 txs / 8 days)
+  //     executeAffirmation  p50 103,610  max   209,989
+  //     submitSignature     p50 182,689  max   306,001
+  //   AMB           0x75Df5AF045d91108662D8080fD1FEFAd6aA0bb59 (600 txs / 1.5 days)
+  //     executeAffirmation  p50  98,018  max 1,132,985  <- tail is the caller-specified msgGasLimit
+  //     submitSignature     p50 181,872  max   420,265
+  // Each value is ~2.4x the observed max and is used as the FINAL gas limit: the watchers pass an
+  // explicit numeric `extraGas` so sender.js takes the exact-sum branch and does NOT apply the
+  // EXTRA_GAS_PERCENTAGE multiplier (note that multiplier is 1 + 4 = 5x, not 4%).
+  HARDCODED_GAS_LIMIT: {
+    AFFIRMATION_REQUEST: 500000,
+    SIGNATURE_REQUEST: 750000,
+    AMB_SIGNATURE_REQUEST: 1000000,
+    // AMB affirmations additionally pay the gas limit the message itself carries, so this covers
+    // only the bridge-side overhead; the watcher adds msgGasLimit + the message-length term.
+    AMB_AFFIRMATION_REQUEST_BASE: 400000
+  },
   MAX_CONCURRENT_EVENTS: 50,
   MAX_HISTORY_BLOCK_TO_REPROCESS: 10000,
   MAX_CONSECUTIVE_FAILURES: 10,
