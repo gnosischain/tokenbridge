@@ -116,5 +116,7 @@ During initialization in `initialize()` (`src/watcher.js`), check whether the `s
 
 - [x] Code
 - [x] Unit Test
-- [ ] E2E test (refer to repo[gnosischain/bridge-validator-e2e-test](https://github.com/gnosischain/bridge-validator-e2e-test))
+- [x] E2E test (refer to repo[gnosischain/bridge-validator-e2e-test](https://github.com/gnosischain/bridge-validator-e2e-test))
 - [x] Docker compose
+- [ ] New Docker image
+- [ ] Verification script
