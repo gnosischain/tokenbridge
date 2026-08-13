@@ -294,13 +294,11 @@ async function getLastBlockToProcess(beaconChainUrls, elRpcUrls) {
     const safeBlock = (await getBlock(web3, 'safe')).number
     logger.info({ safeBlock }, 'Latest safe block')
     return safeBlock
-  } else if (blockProcessingMode === 'block-finality') {
-    const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
-    logger.info({ lastFinalizedBlock }, 'Latest finalized block')
-    return lastFinalizedBlock
-  } else {
-    logger.error('Invalid block processing mode')
   }
+
+  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
+  logger.info({ lastFinalizedBlock }, 'Latest finalized block')
+  return lastFinalizedBlock
 }
 
 async function main({ sendToQueue }) {
@@ -332,14 +330,9 @@ async function main({ sendToQueue }) {
     }
 
     const fromBlock = lastProcessedBlock + 1
-    const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
-    let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
-    intendedToBlock = toBlock
 
-    if (toBlock < fromBlock) {
-      logger.info(`From block < to block: skip processing and wait until the next cycle`)
-      return
-    }
+    let toBlock = Math.min(lastBlockToProcess, fromBlock + blockPollingLimit)
+    intendedToBlock = toBlock
 
     let events
     try {
