@@ -4,7 +4,7 @@ const { connectWatcherToQueue, connection } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
-const { getBlockNumber, getBlock, getEvents, verifySafeBlockSupport } = require('./tx/web3')
+const { getBlock, getEvents, verifySafeBlockSupport } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
 const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS, MAX_CONSECUTIVE_FAILURES } = require('./utils/constants')
 const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
@@ -42,6 +42,7 @@ const {
 // Mutable: the startup `safe` verification (initialize) may demote an fcr watcher to
 // 'block-finality' for the rest of the process lifetime. getLastBlockToProcess and
 // recordSafeTxs read this, so it must not be a const.
+// Validated in base.config.js, so this is always 'fcr' or 'block-finality'.
 let blockProcessingMode = config.main.blockProcessingMode
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
@@ -89,10 +90,8 @@ async function initialize() {
         blockProcessingMode = 'block-finality'
       }
     } else if (blockProcessingMode === 'block-finality') {
-      const finalizedBlock = await getBlock(web3, 'finalized')
-      if (!finalizedBlock) {
-        throw new Error('Finalized block is not available')
-      }
+      const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrl, web3.currentProvider.urls || [])
+      logger.info({ lastFinalizedBlock }, 'Finality preflight passed')
     }
 
     // Resume point precedence: stored progress in redis (getLastProcessedBlock below)
@@ -352,13 +351,11 @@ async function main({ sendToQueue }) {
         filter: config.eventFilter
       })
     } catch (e) {
-      logger.warn(
-        { fromBlock, toBlock, error: e.message },
-        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC'
+      logger.fatal(
+        { skipFrom: fromBlock, skipTo: lastBlockToProcess, error: e.message },
+        'Failed to fetch events - resyncing to the finality head. Events in the skipped range will not be processed.'
       )
-      const latestBlock = await getBlockNumber(web3)
-      logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
-      await updateLastProcessedBlock(latestBlock)
+      await updateLastProcessedBlock(lastBlockToProcess)
       consecutiveFailures = 0
       return
     }

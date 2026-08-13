@@ -39,7 +39,7 @@ Enable **FCR (Fast Confirmation Rule)** processing for the oracle validator (wat
 | Var                                    | Values                    | Default          | Purpose                          |
 | -------------------------------------- | ------------------------- | ---------------- | -------------------------------- |
 | `ORACLE_HOME_BLOCK_PROCESSING_MODE`    | `fcr` \| `block-finality` | `block-finality` | Home watcher processing mode.    |
-| `ORACLE_FOREIGN_BLOCK_PROCESSING_MODE` | `fcr` \| `block-finality` | `block-finality` | Foreign watcher processing mode. |
+| `ORACLE_FOREIGN_BLOCK_PROCESSING_MODE` | `fcr` \| `block-finality` | `fcr`            | Foreign watcher processing mode. |
 
 ### New constants (`src/utils/constants.js`, hardcoded — not env-overridable)
 
