@@ -7,12 +7,33 @@ module.exports = {
   MAX_CONCURRENT_EVENTS: 50,
   MAX_HISTORY_BLOCK_TO_REPROCESS: 10000,
   MAX_CONSECUTIVE_FAILURES: 10,
+  SAFE_BLOCK_PROBE_RETRIES: 10,
+  SAFE_BLOCK_PROBE_DELAY_MS: 5000,
+  SAFE_BLOCK_MAX_GAP: 32,
+  // Kept deliberately small. The poll loop is the real retry mechanism: lastProcessedBlock only
+  // advances on success and runMain re-schedules unconditionally, so a failed cycle re-requests
+  // the identical range on the next tick, forever. In-call retry only needs to cover a dropped
+  // packet. The previous {retries: 20, factor: 1.4, maxTimeout: 360000} produced a 30-60 minute
+  // backoff budget behind a 20s watchdog, so the process was always killed during the first
+  // fan-out and the retries were unreachable.
+  // Worst-case backoff here: (500 + 1000) * 2 = 3000ms.
   RETRY_CONFIG: {
-    retries: 20,
-    factor: 1.4,
-    maxTimeout: 360000,
+    retries: 2,
+    factor: 2,
+    minTimeout: 500,
+    maxTimeout: 4000,
     randomize: true
   },
+  DEFAULT_POLLING_INTERVAL: 5000,
+  DEFAULT_RPC_REQUEST_TIMEOUT: 10000,
+  DEFAULT_BLOCK_POLLING_LIMIT: 4000,
+  DEFAULT_SYNC_STATE_CHECK_INTERVAL: 60000,
+  // Below roughly twice the block time the sync checker keeps seeing "no new block" and flaps
+  // between RPC urls on every check.
+  MIN_SYNC_STATE_CHECK_INTERVAL: 15000,
+  // maxProcessingTime must exceed the worst-case RPC budget by this factor. A cycle makes several
+  // sequential RPC calls, so equality would still leave the watchdog firing on ordinary slowness.
+  WATCHDOG_HEADROOM: 3,
   DEFAULT_UPDATE_INTERVAL: 600000,
   DEFAULT_GAS_PRICE_FACTOR: 1,
   EXIT_CODES: {

@@ -3,15 +3,18 @@ const {
   AlreadyProcessedError,
   AlreadySignedError,
   InvalidValidatorError,
-  NotApprovedByHashiError,
+  // HASHI: disabled
+  // NotApprovedByHashiError,
   EstimateGasError
 } = require('../../utils/errors')
 const logger = require('../../services/logger').child({
   module: 'processAffirmationRequests:estimateGas'
 })
-const { addToRetryQueue } = require('../../utils/sendToRetryQueue')
+// HASHI: disabled
+// const { addToRetryQueue } = require('../../utils/sendToRetryQueue')
 
-async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, nonce, address, transactionHash }) {
+// HASHI: disabled — `transactionHash` was only used by the Hashi retry queue
+async function estimateGas({ web3, homeBridge, validatorContract, recipient, value, nonce, address }) {
   try {
     return await homeBridge.methods.executeAffirmation(recipient, value, nonce).estimateGas({
       from: address
@@ -24,32 +27,33 @@ async function estimateGas({ web3, homeBridge, validatorContract, recipient, val
     const messageHash = web3.utils.soliditySha3(recipient, value, nonce)
     const senderHash = web3.utils.soliditySha3(address, messageHash)
 
-    // Check Hashi approval if available
-    try {
-      const isHashiMandatory = await homeBridge.methods.HASHI_IS_MANDATORY().call()
-      const isHashiEnabled = await homeBridge.methods.HASHI_IS_ENABLED().call()
-
-      logger.debug('Check if is approved by Hashi')
-      if (isHashiMandatory === true && isHashiEnabled === true) {
-        const isApprovedByHashi = await homeBridge.methods.isApprovedByHashi(messageHash).call()
-
-        if (!isApprovedByHashi) {
-          await addToRetryQueue({
-            bridge: 'xdai',
-            transactionHash,
-            recipient,
-            value,
-            nonce
-          })
-          throw new NotApprovedByHashiError()
-        }
-      }
-    } catch (hashiError) {
-      if (hashiError instanceof NotApprovedByHashiError) {
-        throw hashiError
-      }
-      logger.debug('Hashi check not available on this contract, skipping')
-    }
+    // HASHI: disabled
+    // // Check Hashi approval if available
+    // try {
+    //   const isHashiMandatory = await homeBridge.methods.HASHI_IS_MANDATORY().call()
+    //   const isHashiEnabled = await homeBridge.methods.HASHI_IS_ENABLED().call()
+    //
+    //   logger.debug('Check if is approved by Hashi')
+    //   if (isHashiMandatory === true && isHashiEnabled === true) {
+    //     const isApprovedByHashi = await homeBridge.methods.isApprovedByHashi(messageHash).call()
+    //
+    //     if (!isApprovedByHashi) {
+    //       await addToRetryQueue({
+    //         bridge: 'xdai',
+    //         transactionHash,
+    //         recipient,
+    //         value,
+    //         nonce
+    //       })
+    //       throw new NotApprovedByHashiError()
+    //     }
+    //   }
+    // } catch (hashiError) {
+    //   if (hashiError instanceof NotApprovedByHashiError) {
+    //     throw hashiError
+    //   }
+    //   logger.debug('Hashi check not available on this contract, skipping')
+    // }
 
     // Check if minimum number of validations was already reached
     try {

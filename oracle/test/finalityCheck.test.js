@@ -77,7 +77,7 @@ describe('blockFinalityCheck', () => {
       try {
         await checkLastFinalizedBlock(['https://example.com/finalized'])
       } catch (e) {
-        expect(loggerStub.warn.calledWith('Empty or invalid response from beacon URL 1: https://example.com/finalized/eth/v1/beacon/blocks/finalized')).to.be.true
+        expect(loggerStub.warn.calledWith('Empty or invalid response from beacon URL 1: https://example.com/finalized/eth/v2/beacon/blocks/finalized')).to.be.true
         expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
       }
     })
@@ -99,11 +99,11 @@ describe('blockFinalityCheck', () => {
 
       const result = await checkLastFinalizedBlock(['https://examples.com/finalized'])
 
-      expect(result).to.equal('123532')
+      expect(result).to.equal(123532)
       expect(loggerStub.info.calledWith('Last finalized block: 123532 (from beacon URL 1)')).to.be.true
       expect(sendGetStub.calledOnce).to.be.true
       expect(
-        sendGetStub.calledWith('https://examples.com/finalized/eth/v1/beacon/blocks/finalized', {
+        sendGetStub.calledWith('https://examples.com/finalized/eth/v2/beacon/blocks/finalized', {
           requestTimeout: 30000
         })
       ).to.be.true
@@ -128,9 +128,9 @@ describe('blockFinalityCheck', () => {
 
       const result = await checkLastFinalizedBlock(['https://beacon1.com', 'https://beacon2.com'])
 
-      expect(result).to.equal('123532')
+      expect(result).to.equal(123532)
       expect(sendGetStub.calledTwice).to.be.true
-      expect(loggerStub.warn.calledWith('Failed to get finalized block from beacon URL 1 (https://beacon1.com/eth/v1/beacon/blocks/finalized): Network timeout')).to.be.true
+      expect(loggerStub.warn.calledWith('Failed to get finalized block from beacon URL 1 (https://beacon1.com/eth/v2/beacon/blocks/finalized): Network timeout')).to.be.true
       expect(loggerStub.info.calledWith('Last finalized block: 123532 (from beacon URL 2)')).to.be.true
     })
 
@@ -164,11 +164,45 @@ describe('blockFinalityCheck', () => {
 
       const result = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
 
-      expect(result).to.equal('123456')
+      expect(result).to.equal(123456)
       expect(sendGetStub.calledOnce).to.be.true
       expect(sendStub.calledOnce).to.be.true
       expect(loggerStub.info.calledWith('All beacon chain URLs failed, falling back to EL RPC')).to.be.true
       expect(loggerStub.info.calledWith('Last finalized block: 123456 (from EL RPC URL 1)')).to.be.true
+    })
+
+    it('should skip beacon URLs and use EL RPC directly after a full beacon failure', async () => {
+      sendGetStub.rejects(new Error('Beacon down'))
+      sendStub.resolves({ jsonrpc: '2.0', id: 1, result: { number: '0x1e240' } })
+
+      // First cycle: beacon is tried, all fail, EL RPC used.
+      const first = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(first).to.equal(123456)
+      expect(sendGetStub.calledOnce).to.be.true
+      expect(
+        loggerStub.info.calledWith(
+          'Beacon chain unreachable; preferring EL RPC for subsequent cycles (restart to re-probe beacon)'
+        )
+      ).to.be.true
+
+      // Second cycle: beacon is skipped entirely, EL RPC used directly.
+      const second = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
+      expect(second).to.equal(123456)
+      expect(sendGetStub.calledOnce).to.be.true // still just the one call from the first cycle
+      expect(sendStub.calledTwice).to.be.true
+    })
+
+    it('should still try beacon when no EL RPC is configured, even after a beacon failure', async () => {
+      sendGetStub.onFirstCall().rejects(new Error('Beacon down'))
+      sendGetStub.onSecondCall().resolves({
+        data: { message: { body: { execution_payload: { block_number: '777' } } } }
+      })
+
+      // No EL RPC: the prefer-EL switch must not engage, so beacon is retried next cycle.
+      await checkLastFinalizedBlock(['https://beacon1.com'], []).catch(() => {})
+      const second = await checkLastFinalizedBlock(['https://beacon1.com'], [])
+      expect(second).to.equal(777)
+      expect(sendGetStub.calledTwice).to.be.true
     })
 
     it('should try multiple EL RPC URLs on fallback', async () => {
@@ -181,7 +215,7 @@ describe('blockFinalityCheck', () => {
         ['https://el-rpc1.com', 'https://el-rpc2.com']
       )
 
-      expect(result).to.equal('100')
+      expect(result).to.equal(100)
       expect(sendStub.calledTwice).to.be.true
       expect(loggerStub.warn.calledWith(sinon.match('Failed to get finalized block from EL RPC URL 1'))).to.be.true
       expect(loggerStub.info.calledWith('Last finalized block: 100 (from EL RPC URL 2)')).to.be.true
@@ -215,12 +249,12 @@ describe('blockFinalityCheck', () => {
       // First call succeeds — populates cache
       sendGetStub.resolves(mockResult)
       const result1 = await checkLastFinalizedBlock(['https://beacon1.com'])
-      expect(result1).to.equal('99999')
+      expect(result1).to.equal(99999)
 
       // Second call — all URLs fail, should return cached block
       sendGetStub.rejects(new Error('Beacon down'))
       const result2 = await checkLastFinalizedBlock(['https://beacon1.com'])
-      expect(result2).to.equal('99999')
+      expect(result2).to.equal(99999)
       expect(loggerStub.warn.calledWith('All beacon chain URLs and EL RPC URLs failed, using cached finalized block: 99999')).to.be.true
     })
 
@@ -229,12 +263,12 @@ describe('blockFinalityCheck', () => {
       sendGetStub.rejects(new Error('Beacon down'))
       sendStub.resolves({ jsonrpc: '2.0', id: 1, result: { number: '0xc350' } })
       const result1 = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
-      expect(result1).to.equal('50000')
+      expect(result1).to.equal(50000)
 
       // Second call — all fail, should return cached block from EL
       sendStub.rejects(new Error('EL down'))
       const result2 = await checkLastFinalizedBlock(['https://beacon1.com'], ['https://el-rpc.com'])
-      expect(result2).to.equal('50000')
+      expect(result2).to.equal(50000)
       expect(loggerStub.warn.calledWith('All beacon chain URLs and EL RPC URLs failed, using cached finalized block: 50000')).to.be.true
     })
   })
@@ -259,7 +293,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('123532')
+        expect(result).to.equal(123532)
         expect(sendGetStub.calledOnce).to.be.true
         expect(loggerStub.info.calledWith('Last finalized block: 123532 (from beacon URL 1)')).to.be.true
       })
@@ -284,7 +318,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('123532')
+        expect(result).to.equal(123532)
         expect(sendGetStub.calledOnce).to.be.true
         expect(loggerStub.info.calledWith('Last finalized block: 123532 (from beacon URL 1)')).to.be.true
 
@@ -311,7 +345,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('99')
+        expect(result).to.equal(99)
         expect(sendGetStub.calledOnce).to.be.true
         expect(loggerStub.info.calledWith('Last finalized block: 99 (from beacon URL 1)')).to.be.true
 
@@ -327,7 +361,7 @@ describe('blockFinalityCheck', () => {
           await getLastBlockToProcess(['https://beacon.rpc.com'])
         } catch (e) {
           expect(e.message).to.equal('Cannot obtain latest finalized block from any provided URL')
-          expect(loggerStub.warn.calledWith('Empty or invalid response from beacon URL 1: https://beacon.rpc.com/eth/v1/beacon/blocks/finalized')).to.be.true
+          expect(loggerStub.warn.calledWith('Empty or invalid response from beacon URL 1: https://beacon.rpc.com/eth/v2/beacon/blocks/finalized')).to.be.true
         }
       })
 
@@ -348,7 +382,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('0')
+        expect(result).to.equal(0)
         expect(loggerStub.info.calledWith('Last finalized block: 0 (from beacon URL 1)')).to.be.true
       })
 
@@ -384,7 +418,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('1000')
+        expect(result).to.equal(1000)
         expect(sendGetStub.calledOnce).to.be.true
         expect(loggerStub.info.calledWith('Last finalized block: 1000 (from beacon URL 1)')).to.be.true
       })
@@ -407,7 +441,7 @@ describe('blockFinalityCheck', () => {
 
         const result = await getLastBlockToProcess(['https://beacon.rpc.com'])
 
-        expect(result).to.equal('500')
+        expect(result).to.equal(500)
         expect(loggerStub.info.calledWith('Last finalized block: 500 (from beacon URL 1)')).to.be.true
       })
 

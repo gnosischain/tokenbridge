@@ -4,7 +4,7 @@ const { connectWatcherToQueue, connection } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const logger = require('./services/logger')
 const { getShutdownFlag } = require('./services/shutdownState')
-const { getBlockNumber, getEvents } = require('./tx/web3')
+const { getBlock, getEvents, verifySafeBlockSupport } = require('./tx/web3')
 const { checkHTTPS, watchdog } = require('./utils/utils')
 const { EXIT_CODES, MAX_HISTORY_BLOCK_TO_REPROCESS, MAX_CONSECUTIVE_FAILURES } = require('./utils/constants')
 const { checkLastFinalizedBlock } = require('./blockFinalityCheck')
@@ -37,11 +37,21 @@ const {
   reprocessingOptions,
   blockPollingLimit,
   syncCheckInterval,
-  beaconChainUrl,
+  beaconChainUrl
 } = config.main
+// Mutable: the startup `safe` verification (initialize) may demote an fcr watcher to
+// 'block-finality' for the rest of the process lifetime. getLastBlockToProcess and
+// recordSafeTxs read this, so it must not be a const.
+// Validated in base.config.js, so this is always 'fcr' or 'block-finality'.
+let blockProcessingMode = config.main.blockProcessingMode
 const lastBlockRedisKey = `${config.id}:lastProcessedBlock`
 const lastReprocessedBlockRedisKey = `${config.id}:lastReprocessedBlock`
 const seenEventsRedisKey = `${config.id}:seenEvents`
+// Keyed by chain (home/foreign), not by watcher id: FCR is a per-chain mode and the
+// block-hash finality check is chain-level, so all watchers on the same chain share
+// one pending set (idempotent zadd dedups blocks seen by multiple watchers).
+const pendingSafeBlocksRedisKey = `${chain}:pendingSafeBlocks`
+const pendingSafeTxsRedisKey = blockHash => `${chain}:pendingSafeTxs:${blockHash}`
 let lastProcessedBlock = startBlock != null ? Math.max(startBlock - 1, 0) : 0
 let lastReprocessedBlock
 let consecutiveFailures = 0
@@ -65,17 +75,46 @@ async function initialize() {
       beaconChainUrl.forEach(checkHttps(chain))
     }
 
+    if (blockProcessingMode === 'fcr') {
+      // Rational: check FCR_integration.md FCR-02
+      const result = await verifySafeBlockSupport(web3)
+      if (result.supported) {
+        logger.info({ safe: result.safe, latest: result.latest, gap: result.gap }, 'FCR: safe block supported')
+      } else if (result.fatal) {
+        throw new Error(`Safe block verification failed: ${result.reason}`)
+      } else {
+        logger.warn(
+          { reason: result.reason, safe: result.safe, latest: result.latest, gap: result.gap },
+          'FCR: safe block not usable — demoting this watcher to block-finality for the process lifetime'
+        )
+        blockProcessingMode = 'block-finality'
+      }
+    } else if (blockProcessingMode === 'block-finality') {
+      const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrl, web3.currentProvider.urls || [])
+      logger.info({ lastFinalizedBlock }, 'Finality preflight passed')
+    }
+
+    // Resume point precedence: stored progress in redis (getLastProcessedBlock below)
+    // wins; else the configured START_BLOCK; else — a cold start with neither — begin at
+    // the current finalized/safe head instead of genesis, so fromBlock becomes the latest
+    // finalized block rather than 1. Runs after the mode check so a demoted fcr watcher
+    // resolves its head via block-finality here.
     if (startBlock == null) {
-      const latestBlock = await getBlockNumber(web3)
-      logger.info({ latestBlock }, 'START_BLOCK not provided, using latest block from RPC')
-      lastProcessedBlock = latestBlock
+      const elRpcUrls = web3.currentProvider.urls || []
+      const headBlock = await getLastBlockToProcess(beaconChainUrl, elRpcUrls)
+      logger.info(
+        { headBlock, blockProcessingMode },
+        'START_BLOCK not provided; using the latest finalized/safe head as the cold-start point (redis progress overrides if present)'
+      )
+      lastProcessedBlock = Math.max(headBlock - 1, 0)
     }
     await getLastProcessedBlock()
     await getLastReprocessedBlock()
     await checkConditions()
+
     connectWatcherToQueue({
       queueName: config.queue,
-      cb: runMain,
+      cb: runMain
     })
   } catch (e) {
     logger.error(e)
@@ -87,14 +126,10 @@ async function runMain({ sendToQueue }) {
   try {
     if (connection.isConnected() && redis.status === 'ready') {
       if (config.maxProcessingTime) {
-        await watchdog(
-          () => main({ sendToQueue }),
-          config.maxProcessingTime,
-          () => {
-            logger.fatal('Max processing time reached')
-            process.exit(EXIT_CODES.MAX_TIME_REACHED)
-          },
-        )
+        await watchdog(() => main({ sendToQueue }), config.maxProcessingTime, () => {
+          logger.fatal('Max processing time reached')
+          process.exit(EXIT_CODES.MAX_TIME_REACHED)
+        })
       } else {
         await main({ sendToQueue })
       }
@@ -175,7 +210,7 @@ async function checkConditions() {
   }
 }
 
-const eventKey = (e) => `${e.transactionHash}-${e.logIndex}`
+const eventKey = e => `${e.transactionHash}-${e.logIndex}`
 
 async function reprocessOldLogs(sendToQueue) {
   const fromBlock = lastReprocessedBlock + 1
@@ -185,10 +220,10 @@ async function reprocessOldLogs(sendToQueue) {
     event: config.event,
     fromBlock,
     toBlock,
-    filter: config.eventFilter,
+    filter: config.eventFilter
   })
   const alreadySeenEvents = await getSeenEvents(fromBlock, toBlock)
-  const missingEvents = events.filter((e) => !alreadySeenEvents[eventKey(e)])
+  const missingEvents = events.filter(e => !alreadySeenEvents[eventKey(e)])
   if (missingEvents.length === 0) {
     logger.debug('No missed events were found')
   } else {
@@ -197,7 +232,7 @@ async function reprocessOldLogs(sendToQueue) {
     if (config.id === 'amb-information-request') {
       // obtain block number and events from the earliest block
       const batchBlockNumber = missingEvents[0].blockNumber
-      const batchEvents = missingEvents.filter((event) => event.blockNumber === batchBlockNumber)
+      const batchEvents = missingEvents.filter(event => event.blockNumber === batchBlockNumber)
 
       // if there are some other events in the later blocks,
       // adjust lastReprocessedBlock so that these events will be processed again on the next iteration
@@ -226,7 +261,7 @@ async function reprocessOldLogs(sendToQueue) {
 async function getSeenEvents(fromBlock, toBlock) {
   const keys = await redis.zrangebyscore(seenEventsRedisKey, fromBlock, toBlock)
   const res = {}
-  keys.forEach((k) => {
+  keys.forEach(k => {
     res[k] = true
   })
   return res
@@ -237,15 +272,32 @@ function deleteSeenEvents(fromBlock, toBlock) {
 }
 
 function addSeenEvents(events) {
-  return redis.zadd(seenEventsRedisKey, ...events.flatMap((e) => [e.blockNumber, eventKey(e)]))
+  return redis.zadd(seenEventsRedisKey, ...events.flatMap(e => [e.blockNumber, eventKey(e)]))
+}
+
+// FCR mode only: record the source block each recorded event lived in, so that once
+// the block is finalized fcrTxsValidator can confirm it stayed canonical
+// The check is per-block (deduped, idempotent zadd); attribution is per-event.
+function recordSafeTxs(events) {
+  const pipeline = redis.pipeline()
+  events.forEach(e => {
+    const blockHash = e.blockHash.toLowerCase()
+    pipeline.zadd(pendingSafeBlocksRedisKey, e.blockNumber, blockHash)
+    pipeline.sadd(pendingSafeTxsRedisKey(blockHash), eventKey(e))
+  })
+  return pipeline.exec()
 }
 
 // Dev: Switch from checking on-chain required block confirmation to beacon chain finalized block
 async function getLastBlockToProcess(beaconChainUrls, elRpcUrls) {
-  logger.info('Checking last finalized block')
-  // Fetch last finalized block:
-  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
+  if (blockProcessingMode === 'fcr') {
+    const safeBlock = (await getBlock(web3, 'safe')).number
+    logger.info({ safeBlock }, 'Latest safe block')
+    return safeBlock
+  }
 
+  const lastFinalizedBlock = await checkLastFinalizedBlock(beaconChainUrls, elRpcUrls)
+  logger.info({ lastFinalizedBlock }, 'Latest finalized block')
   return lastFinalizedBlock
 }
 
@@ -278,14 +330,9 @@ async function main({ sendToQueue }) {
     }
 
     const fromBlock = lastProcessedBlock + 1
-    const rangeEndBlock = blockPollingLimit ? fromBlock + blockPollingLimit : lastBlockToProcess
-    let toBlock = Math.min(lastBlockToProcess, rangeEndBlock)
-    intendedToBlock = toBlock
 
-    if (toBlock < fromBlock) {
-      logger.info(`From block < to block: skip processing and wait until the next cycle`)
-      return
-    }
+    let toBlock = Math.min(lastBlockToProcess, fromBlock + blockPollingLimit)
+    intendedToBlock = toBlock
 
     let events
     try {
@@ -294,16 +341,14 @@ async function main({ sendToQueue }) {
         event: config.event,
         fromBlock,
         toBlock,
-        filter: config.eventFilter,
+        filter: config.eventFilter
       })
     } catch (e) {
-      logger.warn(
-        { fromBlock, toBlock, error: e.message },
-        'Failed to fetch events, block range may be too old. Falling back to latest block from RPC',
+      logger.fatal(
+        { skipFrom: fromBlock, skipTo: lastBlockToProcess, error: e.message },
+        'Failed to fetch events - resyncing to the finality head. Events in the skipped range will not be processed.'
       )
-      const latestBlock = await getBlockNumber(web3)
-      logger.info({ latestBlock }, 'Updating lastProcessedBlock to latest block from RPC')
-      await updateLastProcessedBlock(latestBlock)
+      await updateLastProcessedBlock(lastBlockToProcess)
       consecutiveFailures = 0
       return
     }
@@ -316,7 +361,7 @@ async function main({ sendToQueue }) {
       if (config.id === 'amb-information-request') {
         // obtain block number and events from the earliest block
         const batchBlockNumber = events[0].blockNumber
-        const batchEvents = events.filter((event) => event.blockNumber === batchBlockNumber)
+        const batchEvents = events.filter(event => event.blockNumber === batchBlockNumber)
 
         // if there are some other events in the later blocks,
         // adjust lastProcessedBlock so that these events will be processed again on the next iteration
@@ -346,6 +391,9 @@ async function main({ sendToQueue }) {
       if (job != null && job.length > 0) {
         logger.info('Transactions to send:', job.length)
         await sendToQueue(job)
+        if (blockProcessingMode === 'fcr') {
+          await recordSafeTxs(events)
+        }
       }
       if (reprocessingOptions.enabled) {
         await addSeenEvents(events)
@@ -362,7 +410,7 @@ async function main({ sendToQueue }) {
     }
     logger.error(
       { consecutiveFailures, inFlight: intendedToBlock !== null, eventProcessingFailure: isEventProcessingFailure },
-      e.message,
+      e.message
     )
 
     if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES && intendedToBlock !== null) {
