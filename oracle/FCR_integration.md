@@ -15,6 +15,10 @@ Enable **FCR (Fast Confirmation Rule)** processing for the oracle validator (wat
 - **Alert**: false positives are logged and recorded to redis for
   Grafana; nothing is undone on-chain (bridge contracts cannot un-sign).
 
+## Audit
+
+[Audit report](./docs/audit-tokenbridge-fcr.pdf), [source](https://github.com/cducrest/audit-reports/blob/main/tokenbridge-fcr.pdf)
+
 ## New logic changes
 
 | File                                 | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
