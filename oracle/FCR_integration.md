@@ -116,11 +116,31 @@ During initialization in `initialize()` (`src/watcher.js`), check whether the `s
    - gap `>= 32` → `{ supported: false, reason: 'gap-too-large', safe, latest }` → **demote**.
      > 32-block threshold: 32 blocks is ~1 epoch on Ethereum and ~2 epochs on Gnosis Chain. Although there's no official `SAFE_BLOCK_MAX_GAP` value to verify against, `32` is a reasonable number.
 
+## Docker image & Verification
+
+Published image
+
+```
+image: gnosischain/tokenbridge-oracle:v3.12.0
+digest: sha256:94d0048519d0c34fc84a4f84f543073c4a28332046d72ca6a0ebfc647e22411d
+commit: 2bd74a18ff964eb9bc4731250a377948fde58225
+```
+
+Verify:
+
+```
+docker buildx imagetools inspect gnosischain/tokenbridge-oracle:v3.12.0 --format '{{.Manifest.Digest}}'
+```
+
+The output should equal the digest above.
+
+For more details about methodology used, refer to [HOW_TO_VERIFY.md](./HOW_TO_VERIFY.md)
+
 ## ToDo List
 
 - [x] Code
 - [x] Unit Test
 - [x] E2E test (refer to repo[gnosischain/bridge-validator-e2e-test](https://github.com/gnosischain/bridge-validator-e2e-test))
 - [x] Docker compose
-- [ ] New Docker image
-- [ ] Verification script
+- [x] New Docker image
+- [x] Verification script
