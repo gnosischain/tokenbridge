@@ -116,6 +116,24 @@ During initialization in `initialize()` (`src/watcher.js`), check whether the `s
    - gap `>= 32` → `{ supported: false, reason: 'gap-too-large', safe, latest }` → **demote**.
      > 32-block threshold: 32 blocks is ~1 epoch on Ethereum and ~2 epochs on Gnosis Chain. Although there's no official `SAFE_BLOCK_MAX_GAP` value to verify against, `32` is a reasonable number.
 
+### FCR-03: a reorg of `safe` blocks is detected and logged, not recovered automatically; missed messages are signed manually.
+
+Issue: In `fcr` mode, a `safe` block can still be reorged out. When that happens, the `safe` head falls back to (at worst) the `finalized` block, which is now lower than `lastProcessedBlock`. Two things follow:
+
+1. Events from the reorged-out blocks have already been attested by the validator (sent to the queue and signed/relayed). Bridge contracts cannot un-sign, so this cannot be undone on-chain.
+2. The watcher only moves forward: `main()` (`src/watcher.js`) returns early with `All blocks already processed` while `safe <= lastProcessedBlock`, then continues from `lastProcessedBlock + 1` once `safe` passes it again. The blocks in `(finalized, lastProcessedBlock]` on the **new** canonical chain are never scanned, so any bridge message included in them is not picked up by the oracle.
+
+Decision: The oracle does **not** recover from this automatically. It does not roll back `lastProcessedBlock`, rescan the reorged range, or take any on-chain action. Instead:
+
+- `fcrTxsChecker` detects the reorg once the affected block is finalized (the stored block hash no longer matches the canonical hash at that height). It logs `FCR false positive: source block reorged out after attestation` and records the affected messages to `${chain}:safeTxFalsePositives` (see [Monitoring](#monitoring)). Nothing else happens automatically.
+- On the alert, operators identify the bridge messages in the new canonical blocks that the watcher skipped, and **request manual signing from the bridge validators** for them.
+
+Rationale:
+
+1. **Rare event.** Reorging a `safe` (fast-confirmed) block needs an abnormal network condition. Adding rollback and rescan logic to cover it would complicate the watcher, and that code would almost never run in production. During the period where hardfork happens, the block processing mode will fallback to `block-finality` to ensure the security of the bridges.
+2. **Human judgment is required.** A reorg past `safe` means something has gone wrong at the consensus layer. Deciding which messages are legitimate and whether to sign them should be done by a person with the full picture, not by the oracle automatically re-signing.
+3. **The attestation can't be undone anyway.** Messages from reorged-out blocks are already signed, so no automated step in the oracle can fix them. Detection and alerting is what the oracle can usefully provide; the response is operational.
+
 ## Docker image & Verification
 
 Published image
