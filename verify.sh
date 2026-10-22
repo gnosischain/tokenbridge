@@ -30,7 +30,9 @@
 #   BASE_IMAGE_PKG         purl prefix used to find the base image in SLSA
 #                          resolvedDependencies    (default: pkg:docker/node)
 #   BASE_IMAGE_FROM_NAME   token to pin in the Dockerfile FROM line
-#                                                  (default: node:12)
+#                          (default: read from the first FROM line of the tag's
+#                          oracle/Dockerfile, e.g. node:12 for older tags,
+#                          node:24.22.1-trixie-slim for current ones)
 #
 # Exit codes:
 #   0   verification passed
@@ -70,7 +72,8 @@ PLATFORM="linux/$ARCH"
 SOURCE_REPO="${SOURCE_REPO:-https://github.com/gnosischain/tokenbridge.git}"
 IMAGE_REPO="${IMAGE_REPO:-gnosischain/tokenbridge-oracle}"
 BASE_IMAGE_PKG="${BASE_IMAGE_PKG:-pkg:docker/node}"
-BASE_IMAGE_FROM_NAME="${BASE_IMAGE_FROM_NAME:-node:12}"
+# Empty = auto-detect from the cloned oracle/Dockerfile after Step 1.
+BASE_IMAGE_FROM_NAME="${BASE_IMAGE_FROM_NAME:-}"
 
 # --- Host preflight ----------------------------------------------------------
 
@@ -163,6 +166,20 @@ if [[ "$got" != "$exp" ]]; then
   exit 2
 fi
 echo "Tag resolves to expected commit ($EXPECTED_SOURCE_COMMIT)."
+
+# Base image name: taken from the tag's own Dockerfile, so older node:12 tags and
+# newer tags both verify without extra flags. The digest still comes from provenance.
+if [[ -z "$BASE_IMAGE_FROM_NAME" ]]; then
+  BASE_IMAGE_FROM_NAME=$(sed -nE 's/^FROM[[:space:]]+([^@[:space:]]+).*/\1/p' \
+    "$WORKDIR/src/oracle/Dockerfile" | head -1)
+  if [[ -z "$BASE_IMAGE_FROM_NAME" ]]; then
+    echo "ERROR: could not read the base image from oracle/Dockerfile. Set BASE_IMAGE_FROM_NAME." >&2
+    exit 2
+  fi
+fi
+# Regex-escaped copy for grep/sed patterns ('.' in e.g. node:24.22.1 must match literally).
+BASE_IMAGE_FROM_RE=$(printf '%s' "$BASE_IMAGE_FROM_NAME" | sed 's/[][\.*^$|/]/\\&/g')
+echo "Base image (from Dockerfile): $BASE_IMAGE_FROM_NAME"
 
 # --- Step 2: resolve base-image digest from SLSA provenance ------------------
 
@@ -278,7 +295,7 @@ DF="$WORKDIR/src/oracle/Dockerfile"
 # equals the provenance digest (mismatch = finding). Older tags with a floating
 # 'FROM node:12': pin locally so the rebuild can't drift. See VERIFICATION_DETAILS.md.
 EXISTING_PIN=""
-if pin_line=$(grep -oE "^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}@sha256:[0-9a-f]{64}" "$DF" | head -1); then
+if pin_line=$(grep -oE "^FROM[[:space:]]+${BASE_IMAGE_FROM_RE}@sha256:[0-9a-f]{64}" "$DF" | head -1); then
   EXISTING_PIN="${pin_line##*@}"   # -> sha256:<hex>
 fi
 
@@ -299,8 +316,8 @@ else
   # case, then EOL case) keep '$' out of an alternation, for BSD sed (macOS).
   # Does not match fully-qualified or ARG-driven FROM lines — see hard-fail below.
   sed -i.bak -E \
-    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}([[:space:]])|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}\1|" \
-    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_NAME}\$|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}|" \
+    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_RE}([[:space:]])|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}\1|" \
+    -e "s|^FROM[[:space:]]+${BASE_IMAGE_FROM_RE}\$|FROM ${BASE_IMAGE_FROM_NAME}@sha256:${NODE_DIGEST}|" \
     "$DF"
   rm -f "${DF}.bak"
 
