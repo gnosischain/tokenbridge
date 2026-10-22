@@ -27,7 +27,7 @@ Digests are never hardcoded; each is read at runtime:
 
 | Variable              | What it is                                      | Source                            |
 | --------------------- | ----------------------------------------------- | --------------------------------- |
-| `$BASE_DIGEST`        | `node:12` digest CI resolved at build time      | SLSA provenance (Full, Step 2)    |
+| `$BASE_DIGEST`        | base-image digest CI resolved at build time     | SLSA provenance (Full, Step 2)    |
 | `$RECORDED_DIGEST`    | index digest CI recorded for the release        | release **Published image** block |
 | `$LIVE_DIGEST`        | index digest the registry serves now            | `imagetools inspect`              |
 | `$ATTESTATION_DIGEST` | per-platform attestation-manifest digest (signed) | `imagetools inspect` of the index |
@@ -126,7 +126,7 @@ git worktree add "$WORKTREE" "$TAG"
 
 ### 2. Read the base-image digest from provenance
 
-CI records the `node:12` digest it resolved in the image's SLSA provenance — the source of truth
+CI records the base-image (`node:*`) digest it resolved in the image's SLSA provenance — the source of truth
 for what went into the build. Extract just the dependency list (not the whole document, which
 embeds a git commit message that can carry a raw newline jq ≥ 1.7 rejects). The lookup path
 varies along two axes: **multi-platform** images (current pipeline) key provenance by platform
@@ -155,15 +155,16 @@ echo "$META" | jq '{startedOn, finishedOn, buildStartedOn, buildFinishedOn}'
 
 ### 3. Confirm (or pin) the base image
 
-`oracle/Dockerfile` pins `node:12` by digest. Confirm the pin matches `$BASE_DIGEST`:
+`oracle/Dockerfile` pins its base image by digest. Since the Node 24 upgrade that is
+`node:24.22.1-trixie-slim`; tags before it use `node:12`. Confirm the pin matches `$BASE_DIGEST`:
 
 ```bash
-grep '^FROM node:12@sha256:' "$WORKTREE/oracle/Dockerfile"   # digest must equal $BASE_DIGEST
+grep '^FROM node:' "$WORKTREE/oracle/Dockerfile"   # digest after '@' must equal $BASE_DIGEST
 ```
 
 Mismatch → published image used a different base than the committed Dockerfile claims; stop.
 
-**Older tags** with a floating `FROM node:12` must be pinned locally (else native modules drift):
+**Older (node:12) tags** with a floating `FROM node:12` must be pinned locally (else native modules drift):
 
 ```bash
 sed -i.bak -E \
@@ -180,7 +181,8 @@ docker buildx build --platform linux/amd64 --no-cache --provenance=false --sbom=
 ```
 
 `--no-cache` (fresh layers), `--provenance=false --sbom=false` (plain image to diff), `--load`
-(import to daemon). ~5–10 min on amd64, longer under emulation. apt warnings are non-fatal.
+(import to daemon). ~5–10 min on amd64, longer under emulation. Older node:12 tags also run
+apt-get; apt warnings there are non-fatal.
 
 ### 5. Pull the published image, export both filesystems
 
@@ -235,8 +237,8 @@ local changes — re-check `git -C "$WORKTREE" status` and redo from Step 1.
 
 ### Troubleshooting
 
-- **`apt-get update` fails** — Stretch is EOL; the Dockerfile already targets `archive.debian.org`.
-  Retry Step 4 (transient network).
+- **`apt-get update` fails** (older node:12 tags only) — Stretch is EOL; those Dockerfiles already
+  target `archive.debian.org`. Retry Step 4 (transient network). Node 24 tags don't use apt.
 - **`yarn install` fails** — non-amd64 host without `linux/amd64` emulation; enable Rosetta/QEMU
   in Docker Desktop and retry.
 

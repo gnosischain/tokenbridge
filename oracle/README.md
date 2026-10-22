@@ -8,6 +8,20 @@ The oracle is deployed on specified validator nodes (only nodes whose private ke
 - listening to events related to bridge contracts
 - sending transactions to authorize asset transfers
 
+### Runtime / Node version
+
+The oracle Docker image runs on **Node.js 24.22.1** (the October 2026 security release), pinned by
+digest in `oracle/Dockerfile`. This replaced Node.js 12, which is end-of-life upstream and no longer
+receives security patches (e.g. the Brotli decompression RCE CVE-2026-111497 fixed in 24.22.1).
+
+Notes:
+- The image installs dependencies with `--ignore-scripts`, so nothing is compiled during the build.
+  Every native module in the dependency tree has a pure-JS fallback, so no build toolchain or
+  `apt` packages are needed.
+- When upgrading for a future Node.js security release, bump both the version tag and the `@sha256:`
+  digest on the `FROM` line in `oracle/Dockerfile`. See [VERIFICATION_DETAILS.md](./VERIFICATION_DETAILS.md)
+  for how the base image is verified.
+
 ## Architecture
 
 ### ERC20-to-Native
