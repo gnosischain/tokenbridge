@@ -1,0 +1,43 @@
+name: Oracle E2E
+
+# End-to-end tests for the oracle built from this commit. The tests, the CI
+# scripts and the job matrix live in gnosischain/bridge-validator-e2e-test; this
+# file only calls its reusable workflow. Each job forks Ethereum and Gnosis
+# Chain on fresh Tenderly Virtual TestNets, deleted when the job ends.
+#
+# Needs secrets TENDERLY_API_TOKEN, TENDERLY_ACCOUNT_ID, TENDERLY_PROJECT
+# (repo or org level).
+
+on:
+  pull_request:
+    paths:
+      - 'oracle/**'
+      - 'commons/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/oracle_e2e.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'oracle/**'
+      - 'commons/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/oracle_e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    # PRs from forks get no secrets, so skip rather than fail.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    uses: gnosischain/bridge-validator-e2e-test/.github/workflows/e2e.yml@main
+    with:
+      tokenbridge_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    secrets: inherit
